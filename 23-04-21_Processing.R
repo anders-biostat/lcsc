@@ -703,83 +703,83 @@ for (i in 1:dim(sample_info)[1]) {
 }
 sample_info <- cbind(sample_info, cumulative)
 
-###############################################################################
-
-# Calculate the Jaccard Indices for all samples (could take very long this way)
-
-# How to speed up the calculation
-# Multithreading? -> https://furrr.futureverse.org/
-
-# Option 1
-calc_jaccard = function(dims, all_NN_subset) {
-  
-  # Initialize matrix
-  mt <- matrix(nrow=dims, ncol=dims)
-  
-  # Speed it up by just doing half the matrix (which also contains all the information)
-  for (i in 1:dims) {
-    for (j in i:dims) {
-      mt[i, j] <- sum(all_NN_subset$idx[i,] %in% all_NN_subset$idx[j,])
-      # mt[i, j] <- length(union(all_NN_subset$idx[i,], all_NN_subset$idx[j,]))
-    }
-  }
-  return(mt/100)
-}
-
-# Compile functions (does that even help -> TODO benchmark different methods)
-calc_jaccard_cmd <- compiler::cmpfun(calc_jaccard)
-
-# Wrapper for the function
-wrapper_jaccard_pcx = function(sm) {
-  
-  # Progress
-  cat( sm, " " )
-  
-  # Get the subset information
-  subset <- cells$sample==sm
-  dims <- sum(subset)
-  correction <- sample_info$cumulative[grep(sm, sample_info$sample)]
-  all_NN_subset <- list(idx = (all_NN_pcx$idx[subset,] - correction), 
-                        dist = all_NN_pcx$dist[subset,])
-  
-  jac_i <- calc_jaccard_cmd(dims=dims, all_NN_subset=all_NN_subset)
-  return(jac_i)
-}
-
-# Wrapper for the function
-wrapper_jaccard_pcs = function(sm) {
-  
-  # Progress
-  cat( sm, " " )
-  
-  # Get the subset information
-  subset <- cells$sample==sm
-  dims <- sum(subset)
-  correction <- sample_info$cumulative[grep(sm, sample_info$sample)]
-  all_NN_subset <- list(idx = (all_NN_pcs$idx[subset,] - correction), 
-                        dist = all_NN_pcs$dist[subset,])
-  
-  jac_i <- calc_jaccard_cmd(dims=dims, all_NN_subset=all_NN_subset)
-  return(jac_i)
-}
-
-# Using furrr
-#library(furrr)
-#plan(multisession, workers = 13)
-
-# PCX space
-
-sample_info$sample %>% map(wrapper_jaccard_pcx) -> jaccard_pcx
-
-names(jaccard_pcx) <- sample_info$sample
-
-# PCS space
-
-sample_info$sample %>% map(wrapper_jaccard_pcs) -> jaccard_pcs
-
-names(jaccard_pcs) <- sample_info$sample
-
-###############################################################################
+# ###############################################################################
+# 
+# # Calculate the Jaccard Indices for all samples (could take very long this way)
+# 
+# # How to speed up the calculation
+# # Multithreading? -> https://furrr.futureverse.org/
+# 
+# # Option 1
+# calc_jaccard = function(dims, all_NN_subset) {
+#   
+#   # Initialize matrix
+#   mt <- matrix(nrow=dims, ncol=dims)
+#   
+#   # Speed it up by just doing half the matrix (which also contains all the information)
+#   for (i in 1:dims) {
+#     for (j in i:dims) {
+#       mt[i, j] <- sum(all_NN_subset$idx[i,] %in% all_NN_subset$idx[j,])
+#       # mt[i, j] <- length(union(all_NN_subset$idx[i,], all_NN_subset$idx[j,]))
+#     }
+#   }
+#   return(mt/100)
+# }
+# 
+# # Compile functions (does that even help -> TODO benchmark different methods)
+# calc_jaccard_cmd <- compiler::cmpfun(calc_jaccard)
+# 
+# # Wrapper for the function
+# wrapper_jaccard_pcx = function(sm) {
+#   
+#   # Progress
+#   cat( sm, " " )
+#   
+#   # Get the subset information
+#   subset <- cells$sample==sm
+#   dims <- sum(subset)
+#   correction <- sample_info$cumulative[grep(sm, sample_info$sample)]
+#   all_NN_subset <- list(idx = (all_NN_pcx$idx[subset,] - correction), 
+#                         dist = all_NN_pcx$dist[subset,])
+#   
+#   jac_i <- calc_jaccard_cmd(dims=dims, all_NN_subset=all_NN_subset)
+#   return(jac_i)
+# }
+# 
+# # Wrapper for the function
+# wrapper_jaccard_pcs = function(sm) {
+#   
+#   # Progress
+#   cat( sm, " " )
+#   
+#   # Get the subset information
+#   subset <- cells$sample==sm
+#   dims <- sum(subset)
+#   correction <- sample_info$cumulative[grep(sm, sample_info$sample)]
+#   all_NN_subset <- list(idx = (all_NN_pcs$idx[subset,] - correction), 
+#                         dist = all_NN_pcs$dist[subset,])
+#   
+#   jac_i <- calc_jaccard_cmd(dims=dims, all_NN_subset=all_NN_subset)
+#   return(jac_i)
+# }
+# 
+# # Using furrr
+# #library(furrr)
+# #plan(multisession, workers = 13)
+# 
+# # PCX space
+# 
+# sample_info$sample %>% map(wrapper_jaccard_pcx) -> jaccard_pcx
+# 
+# names(jaccard_pcx) <- sample_info$sample
+# 
+# # PCS space
+# 
+# sample_info$sample %>% map(wrapper_jaccard_pcs) -> jaccard_pcs
+# 
+# names(jaccard_pcs) <- sample_info$sample
+# 
+# ###############################################################################
 
 # Process the annotation data
 
