@@ -1,39 +1,39 @@
 <head>
-	<title>Ex2plorer</title>
+	<title>lcsc</title>
 </head>
 <body>
-  <div id = "page_layout" style="display: grid; 
-  grid-template-columns: 320px 120px 400px 120px 420px 200px; 
+  <div id = "page_layout" style="display: grid;
+  grid-template-columns: 320px 120px 400px 120px 420px 200px;
   grid-template-rows: 40px 40px 40px 40px 40px 40px 40px 40px 40px 40px 40px 40px 40px 40px 40px 1000px id">
-    
+
     <!-- Plots to adjust the distance -->
 	  <div id = "avg_dist_hist" style="grid-column: 1; grid-row-start: 1; grid-row-end: 5"></div>
 	  <div id = "nn_below_plot" style="grid-column: 1; grid-row-start: 5; grid-row-end: 9"></div>
-	  
+
 	  <!-- Panel to adjust the distance -->
 	  <div id = "nn_considered" style="grid-column: 2; grid-row-start: 1; grid-row-end: 2"></div>
 	  <div id = "distance_cutoff" style="grid-column: 2; grid-row-start: 2; grid-row-end: 3"></div>
 	  <div id = "button_hist_scatter_nn_below" style="grid-column: 2; grid-row-start: 3; grid-row-end: 4"></div>
-	    
+
 	  <!-- Plots to adjust the threshold used for the fraction -->
 	  <div id = "fraction_plot" style="grid-column: 3; grid-row-start: 1; grid-row-end: 5"></div>
 	  <div id = "fraction_embedding" style="grid-column: 3; grid-row-start: 5; grid-row-end: 9"></div>
-	  
+
 	  <!-- Panel to adjust the threshold used for the fraction -->
 	  <div id = "button_hist_scatter_fraction" style="grid-column: 4; grid-row-start: 1; grid-row-end: 2"></div>
 	  <div id = "input_gamma" style="grid-column: 4; grid-row-start: 2; grid-row-end: 3"></div>
 	  <div id = "input_threshold" style="grid-column: 4; grid-row-start: 3; grid-row-end: 4"></div>
 	  <div id = "button_above_below" style="grid-column: 4; grid-row-start: 4; grid-row-end: 5"></div>
-	  
+
 	  <!-- Plots to adjust the threshold used for the fraction -->
 	  <div id = "classification_plot" style="grid-column: 5; grid-row-start: 1; grid-row-end: 5"></div>
 	  <div id = "additional_data_plot" style="grid-column: 5; grid-row-start: 5; grid-row-end: 9"></div>
-	  
+
 	  <!-- Panel to select which plots to show  -->
 	  <div id = "button_classfification" style="grid-column: 6; grid-row-start: 1; grid-row-end: 3"></div>
 	  <div id = "button_additional_data" style="grid-column: 6; grid-row-start: 5; grid-row-end: 7"></div>
 	  <div id = "color_slider" style="grid-column: 6; grid-row-start: 7; grid-row-end: 9"></div>
-	  
+
 	      <!-- Start Control Center below the plots -->
     <div id = "sample" style="grid-column: 1; grid-row-start: 9; grid-row-end: 11;
     place-self: center"></div>
@@ -41,7 +41,7 @@
     place-self: center"></div>
     <div id = "warning" style="grid-column: 1; grid-row-start: 13; grid-row-end: 15;
     place-self: center"></div>
-	  
+
 	  <!-- Panel to select which plots to show  -->
 	  <div id = "input_cell" style="grid-column: 3; grid-row-start: 9; grid-row-end: 11;
     place-self: center"></div>
@@ -53,33 +53,33 @@
     place-self: center"></div>
 	  <div id = "button_rule" style="grid-column: 4; grid-row-start: 11; grid-row-end: 13;
     place-self: center"></div>
-    
+
     <!-- Add option to delete rule -->
     <div id = "delete_rule" style="grid-column: 4; grid-row-start: 13; grid-row-end: 14;
     place-self: center"></div>
-	  
+
 	  <!-- Show all rules for cell type -->
 	  <div style="grid-column: 3; grid-row-start: 13; grid-row-end: 14;
     place-self: center"><p>Rules for Cell Type</p></div>
     <div id = "rule_celltype" style="grid-column: 3; grid-row-start: 14; grid-row-end: 16;
     place-self: center"></div>
-	  
+
 	  <!-- Show all rules in sample -->
 	  <div style="grid-column: 5; grid-row-start: 13; grid-row-end: 14;
     place-self: center"><p>Rules in Sample</p></div>
 	  <div id = "rule_sample" style="grid-column: 5; grid-row-start: 14; grid-row-end: 17;
     place-self: center"></div>
-	  
+
 	  <!-- Add additional settings -->
 	  <div id = "button_tsne_umap" style="grid-column: 5; grid-row-start: 9; grid-row-end: 11;
     place-self: center"></div>
     <div id = "slide_point_size" style="grid-column: 5; grid-row-start: 11; grid-row-end: 13;
     place-self: center"></div>
-    
+
     <!-- Change between smoothed expression and SAVER expression -->
     <div id = "button_frac_calc" style="grid-column: 6; grid-row-start: 9; grid-row-end: 11;
     place-self: center"></div>
-    
+
 	</div>
 </body>
 

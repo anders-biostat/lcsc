@@ -1,8 +1,4 @@
 
-#' @importFrom dplyr %>%
-#' @export
-dplyr::`%>%`
-
 #' Visualize and annotate single cell data
 #' @name lc_vis
 #' @importFrom dplyr %>%
@@ -267,7 +263,7 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                   avg_dist <<- Matrix::rowMeans(nn_subset$dist[,2:(n_NN+1)])
 
                   # Update
-                  update_1()
+                  update_all()
 
 
                 },
@@ -294,7 +290,7 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                   marker <<- gene
 
                   # Update
-                  update_1()
+                  update_all()
 
                 },
                 place = "gene",
@@ -315,15 +311,12 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                     return()
                   }
 
-                  # Checking I
+                  # Checking
                   if (n_neighbors >= k) {
                     display <<- paste("Neighbors considered must be below", k)
                     rlc::updateCharts(c("display_warning"))
                     return()
-                  }
-
-                  # Checking II
-                  if (n_neighbors < 2) {
+                  } else if (n_neighbors < 2) {
                     display <<- "Neighbors considered must be above 1"
                     rlc::updateCharts(c("display_warning"))
                     return()
@@ -335,7 +328,7 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                   # Update k-scores and classification
                   avg_dist <<- Matrix::rowMeans(nn_subset$dist[,2:(n_NN+1)])
 
-                  # Update display to be sure
+                  # Update display to show no error
                   display <<- "..."
 
                   # Update the corresponding charts
@@ -362,7 +355,6 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
 
                   # Update gamma
                   gamma <<- g
-
                   f_M_c <<- f_M^gamma
 
                   # Update the classification
@@ -464,14 +456,11 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                       ),
                       on_clickPosition = function(position) {
 
-                        # Correct for the NA bug
+                        # Correct for the rlc NA bug
                         if (!(is.na(position[1]))) {
 
-                          #
-                          x <- position[2]
-
                           # Update the threshold
-                          threshold <<- x
+                          threshold <<- position[2]
 
                           # Update the classification
                           ifelse(above, classification <<- f_M_c > threshold, classification <<- f_M_c < threshold)
@@ -511,14 +500,11 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                       ),
                       on_clickPosition = function(position) {
 
-                        # Get only the x position
-                        x <- position[1]
-
-                        # Correct for the NA bug
-                        if (!(is.na(x))) {
+                        # Correct for the rlc NA bug
+                        if (!(is.na(position[1]))) {
 
                           # Update the threshold
-                          threshold <<- x
+                          threshold <<- position[1]
 
                           # Update the classification
                           ifelse(above, classification <<- f_M_c > threshold, classification <<- f_M_c < threshold)
@@ -553,29 +539,29 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
 
   # 11. Change between different classification plots
 
-  get_all_class_sample = function() {
+  run_classification_ = function() {
 
     # Get cell types that were assigned in this sample
-    types_sample <- names(g$rules[[sample_select]])
+    types_sample <- names(g$annotations[[sample_select]])
 
-    # Create matrix to store the overall classification
-    classification_matrix <- matrix(data=NA, nrow=sum(selection), ncol=1)
-    rownames(classification_matrix) <- colnames(counts[,selection])
-    colnames(classification_matrix) <- "classification"
+    # Initialize tibble to store classifications
+    tmp_tibble <- tibble::tibble(
+      barcode = g$annotations[[sample_select]][[1]]$barcode,
+      classification = "none")
 
-    # Loop through all assigned cell types and transfer information to classification matrix
     for (type in types_sample) {
-      # Get all the barcodes for the cell type when all == TRUE
-      g$annotations[[sample_select]][[type]] %>% dplyr::filter(.data$all==TRUE) %>% dplyr::select(.data$barcode) %>% unlist -> barcodes_type
-      # For now we don't know what the nature of the double assignment is
-      classification_matrix[barcodes_type,1] <- ifelse(is.na(classification_matrix[barcodes_type,1]), type, "double")
-    }
-    return(classification_matrix %>% unlist)
-  }
 
-  # Some more helper functions, get the classification for the current cell type based on all applied rules
-  helper_1 <- function() {
-    return(g$annotations[[sample_select]][[current_class]]$all)
+      tmp_tibble <- tmp_tibble %>%
+        dplyr::mutate(tmp = g$annotations[[sample_select]][[type]]$all) %>%
+        dplyr::mutate(classification = dplyr::case_when(
+          # ambigious if classification is not nonce and another class is positive for the cell
+          !(classification=="none") & .data$tmp ~ "ambigious",
+          # if classification is nonce and the cell is positive for the class assign the type
+          classification=="none" & .data$tmp ~ type,
+          TRUE ~ classification
+        )) }
+
+      return(tmp_tibble %>% dplyr::pull(classification))
   }
 
   # Here is the actual input form
@@ -622,7 +608,7 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                         x = embedding[selection,1],
                         y = embedding[selection,2],
                         label = colnames(counts)[selection],
-                        colourValue = helper_1(),
+                        colourValue = g$annotations[[sample_select]][[current_class]]$all,
                         colourDomain = c(TRUE, FALSE),
                         palette = c("green", "red"),
                         size = pt_size,
@@ -646,7 +632,7 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                         x = embedding[selection,1],
                         y = embedding[selection,2],
                         label = colnames(counts)[selection],
-                        colourValue = get_all_class_sample(),
+                        colourValue = run_classification_(),
                         #colourDomain = c(TRUE, FALSE),
                         #palette = c("green", "red"),
                         size = pt_size,
@@ -732,14 +718,12 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
 
   # Update 1, which includes everything post sample selection
   # Will need to be called if the whole configuration is not already available
-  update_1 = function() {
+  update_all = function() {
 
     # Get the counts for the marker genes for all cells within the selection.
     c_M <<- counts[marker, selection]
     counts_ci <<- sapply(1:nrow(nn_subset$idx), function(cell_i){
-      neighbors <- nn_subset$idx[cell_i,1:k]
       sum(c_M[nn_subset$idx[cell_i,1:k]])
-
     })
 
     c_tot <<- Matrix::colSums(counts[, selection])
@@ -859,17 +843,17 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
   # Create 2 list to store
 
   # a) annotations per cell type as tibble with barcodes, and rules as columns
-  annotations <- vector(mode = "list", length=length(sample_info$sample))
-  names(annotations) <- sample_info$sample
+  g$annotations <- vector(mode = "list", length=length(sample_info$sample))
+  names(g$annotations) <- sample_info$sample
 
   # b) rules per cell type as names vector with gene, gamma, threshold, above
-  rules <- vector(mode = "list", length=length(sample_info$sample))
-  names(rules) <- sample_info$sample
+  g$rules <- vector(mode = "list", length=length(sample_info$sample))
+  names(g$rules) <- sample_info$sample
 
   # Create empty list for each samples
   for (smp in sample_info$sample) {
-    annotations[[smp]] <- vector(mode="list")
-    rules[[smp]] <- vector(mode="list")
+    g$annotations[[smp]] <- vector(mode="list")
+    g$rules[[smp]] <- vector(mode="list")
   }
 
   # Defining a new cell type
@@ -918,6 +902,15 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
            labels = c("Add Rule"),
            on_click = function(value) {
 
+             if (is.na(current_class)) {
+               display <<- "Cannot add rule without class"
+               rlc::updateCharts(c("display_warning"))
+               return()
+             } else {
+               display <<- "..."
+               rlc::updateCharts(c("display_warning"))
+             }
+
              # Only initiate a new tibble if the cell type has not been used
              if (!(current_class %in% names(g$annotations[[sample_select]]))) {
 
@@ -929,7 +922,7 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                # Adding new column with the currently selected gene and its classification
                g$annotations[[sample_select]][[current_class]][marker] <- classification
 
-               # Adding the meta data (what thresholds were used etc.)
+               # Adding the rule data
                g$rules[[sample_select]][[current_class]] <- tibble::tibble(
                  gene = marker,
                  gamma = gamma,
@@ -938,8 +931,9 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                )
              }
 
-             # Check whether a rule has been created before for the given gene (in this case update and not append the tibble)
-             if (marker %in% g$rules[[sample_select]][[current_class]]$gene) {
+             # Check whether a rule has been created before for the given gene
+             if (marker %in% g$rules[[sample_select]][[current_class]]$gene) # update the tibble
+               {
                g$rules[[sample_select]][[current_class]] <- g$rules[[sample_select]][[current_class]] %>%
                  dplyr::rows_update(tibble::tibble(
                    gene = marker,
@@ -948,8 +942,8 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                    above = above
                  ))
 
-               # Append the new rule for the new gene
-             } else
+
+             } else # Append the new rule for the new gene
              {
                g$rules[[sample_select]][[current_class]] <- g$rules[[sample_select]][[current_class]] %>%
                  dplyr::add_row(
@@ -960,17 +954,17 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                  )
              }
 
+             # Initializing or resetting the all column
              g$annotations[[sample_select]][[current_class]]["all"] <- rep(NULL, length(classification))
 
              g$annotations[[sample_select]][[current_class]][marker] <- classification
 
-             c_tmp <- colnames(g$annotations[[sample_select]][[current_class]])
+             c_names <- colnames(g$annotations[[sample_select]][[current_class]])
 
+             # For checking whether a cell adheres to all rules we have to check all column (=genes) are TRUE
              g$annotations[[sample_select]][[current_class]] <- g$annotations[[sample_select]][[current_class]] %>%
                dplyr::rowwise() %>%
-               # For checking all, take all columns but barcodes and all column (found thus far no easier way!)
-               dplyr::mutate(all = all(dplyr::c_across(cols = setdiff(c_tmp, c("barcode", "all")))))
-             # There must be simpler ways though!
+               dplyr::mutate(all = all(dplyr::c_across(cols = setdiff(c_names, c("barcode", "all"))))) # select all columns but barcode & all
 
              rlc::updateCharts()
 
@@ -987,7 +981,7 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                 title = "Delete Rule for Gene:",
                 on_click = function(value) {
 
-                  if(value %in% g$rules[[sample_select]][[current_class]]["gene"]) {
+                  if(value %in% dplyr::pull(g$rules[[sample_select]][[current_class]], .data$gene)) {
 
                     g$rules[[sample_select]][[current_class]] <- g$rules[[sample_select]][[current_class]] %>%
                       dplyr::filter(.data$gene != value)
@@ -999,17 +993,17 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                     if (length(setdiff(colnames(g$annotations[[sample_select]][[current_class]]), c("barcode", "all"))) == 0) {
                       g$annotations[[sample_select]][[current_class]] <- g$annotations[[sample_select]][[current_class]] %>%
                         dplyr::mutate(all = FALSE)
-                    } else {
-                      # Reevaluate all columns
+                    } else # Reevaluate all columns as done above
+                      {
                       g$annotations[[sample_select]][[current_class]] <- g$annotations[[sample_select]][[current_class]] %>%
                         dplyr::rowwise() %>%
-                        # Check all column but "barcode" and "all", wether the entries in the row are True
                         dplyr::mutate(all = all(dplyr::c_across(cols = setdiff(colnames(.data), c("barcode", "all")))))
                     }
 
-                    # Update everything
-                    update_1()
+                    # Update
+                    update_all()
                   } else {
+                    print("evaluates to FALSE")
                     display <<- "No rule for this gene"
                   }
                   rlc::updateCharts()
