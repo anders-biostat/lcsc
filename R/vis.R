@@ -1,27 +1,30 @@
 
 #' Visualize and annotate single cell data
 #' @name lc_vis
+#' 
 #' @importFrom dplyr %>%
 #' @importFrom rlang .data
+#' 
 #' @param cells data.frame with cell metadata
-#' @param counts count matrix (cols = cells, genes = rows)
-#' @param pc_space PCA coordinates
-#' @param embedding coordinates for two-dimensional embedding
-#' @param nn list containing nearest neighbor information
-#' @param k number of neighbors considered for smoothing
+#' @param counts sparse count matrix (cols = cells, genes = rows)
+#' @param pc_space PCA coordinates (cols = coordiantes, rows = cells)
+#' @param embedding coordinates for two-dimensional embedding (cols = coordiantes, rows = cells)
+#' @param nn list containing nearest neighbor information (created by run_nn function)
+#' @param k number of neighbors considered for smoothing (default k = 50)
+#' 
 #' @export
 lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
 
   ###############################################################################
-
-  # Generate sample info
-  tibble::tibble(sample = unique(cells$sample)) %>%
-    dplyr::rowwise() %>%
-    dplyr::mutate(total = sum(cells$sample == sample)) %>%
-    dplyr::ungroup() -> sample_info
-
-  # Correction factor adjust indices for nn below
-  sample_info$correction = c(0, cumsum(sample_info$total)[1:nrow(sample_info)-1])
+  
+  g_env <- globalenv()
+  
+  # Generate and populate app environment
+  app_env <- new.env()
+  initialize_app_env(app_env, cells, counts, pc_space, embedding, nn, k)
+  rm(cells, counts, pc_space, embedding, nn, k)
+  
+  app_env$sample_info <- generate_sample_info(app_env$cells)
 
   ###############################################################################
 
@@ -31,53 +34,35 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
 
   ###############################################################################
 
-  # Initialize
-  g <- globalenv()
-  marker <- sample(rownames(counts),1)    # select random gene
-  sample_select <- sample_info$sample[1]
-  selection <- cells$sample==sample_select
+  # Initialize the application choosing a random gene and the first sample
+  app_env$marker <- sample(rownames(app_env$counts),1)
+  app_env$sample_select <- app_env$sample_info$sample[1]
+  app_env$selection <- cells$sample==app_env$sample_select
 
   # Getting the nearest neighbors of all cells in the subset.
-  correction <- sample_info %>% dplyr::filter(sample==sample_select) %>% dplyr::pull(correction)
-  nn_subset <- list(idx = (nn$idx[selection,] - correction),
-                    dists = nn$dist[selection,])
+  app_env$correction <- app_env$sample_info %>% dplyr::filter(sample==app_env$sample_select) %>% dplyr::pull(correction)
+  app_env$nn_subset <- list(idx = (app_env$nn$idx[app_env$selection,] - app_env$correction),
+                    dists = app_env$nn$dist[app_env$selection,])
 
-  # Get the average distance for cell_i to x nearest neighbors.
-  n_NN <- 25
-  avg_dist <- Matrix::rowMeans(nn_subset$dists[,2:(n_NN+1)])
+  # Default parameters
+  app_env$n_NN <- 25
+  app_env$gamma = 0.5
+  app_env$threshold <- 0.02
+  app_env$above <- TRUE
+  
+  # Get the average distance for cell_i to n_NN nearest neighbors.
+  app_env$avg_dist <- Matrix::rowMeans(app_env$nn_subset$dists[,2:(app_env$n_NN+1)])
 
-  # Calculate marker counts for cell i also considering the neighboring cells
-  c_M <- counts[marker, selection]
-  counts_ci <- sapply(1:nrow(nn_subset$idx), function(cell_i){
-    sum(c_M[nn_subset$idx[cell_i,]])
-  })
-
-  # Calculate the total counts for cell i also condering the neigboring cells
-  c_tot <- Matrix::colSums(counts[, selection])
-  totals_ci <- sapply(1:nrow(nn_subset$idx), function(cell_i){
-    sum(c_tot[nn_subset$idx[cell_i,]])
-  })
-
-  # Calculate the gamma corrected fractions
-  f_M <- counts_ci/totals_ci
-  gamma = 0.5
-  f_M_c <- f_M^gamma
-
-  # Default fraction threshold
-  threshold <- 0.02
-
-  # Default positive classification if above threshold
-  above <- TRUE
-
-  # Classification
-  ifelse(above, classification <- f_M_c > threshold, classification <- f_M_c < threshold)
+  # Calculate the marker gene fraction smoothed over the neighbors
+  smoothed_fraction_wrapper(app_env)
+  
+  # Classify cells according to whether the smoothed fraction is above or below the threshold
+  update_classification(app_env)
 
   ###############################################################################
 
   # Initial constant for figures
-
-  # Point size
-  pt_size <- 1
+  app_env$pt_size <- 1 # point size
 
   ###############################################################################
 
@@ -90,9 +75,9 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
     width=320,
     height=320,
     data = rlc::dat(
-      value = avg_dist,
+      value = app_env$avg_dist,
       nbins = 100,
-      title = paste("Mean dist to", n_NN, "th nearest neigbor")
+      title = paste0("Mean dist to ", app_env$n_NN, "th nearest neigbor")
     ),
     transitionDuration = 0,
     place = "avg_dist_hist",
@@ -106,12 +91,12 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
     width=320,
     height=320,
     rlc::dat(
-      x = embedding[selection,1],
-      y = embedding[selection,2],
-      label = colnames(counts)[selection],
-      colourValue = avg_dist,
-      size = pt_size,
-      title = paste("Mean dist to", n_NN, "th nearest neigbor"),
+      x = app_env$embedding[app_env$selection,1],
+      y = app_env$embedding[app_env$selection,2],
+      label = colnames(app_env$counts)[app_env$selection],
+      colourValue = app_env$avg_dist,
+      size = app_env$pt_size,
+      title = paste0("Mean dist to ", app_env$n_NN, "th nearest neigbor"),
       on_marked = function() {
       }),
     transitionDuration = 0,
@@ -120,17 +105,16 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
   )
 
   # 3. Plots to show the distribution of the marker gene fraction
-  # Default fraction is scatter
 
   rlc::lc_scatter(
     titleSize=16,
     width=320,
     height=320,
     data = rlc::dat(
-      x = totals_ci^gamma,
-      y = f_M_c,
-      size = pt_size,
-      colourValue = classification,
+      x = app_env$totals_ci^app_env$gamma,
+      y = app_env$f_M_c,
+      size = app_env$pt_size,
+      colourValue = app_env$classification,
       colourDomain = c(TRUE, FALSE),
       palette = c("green", "red")
     ),
@@ -139,16 +123,9 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
       # Correct for the NA bug (on_ClickPosition return first NA and then the value)
       if (!(is.na(position[1]))) {
 
-        # Round to reduce number of digit after decimal point
-        x <- position[2]
-
-        # Update the threshold
-        threshold <<- x
-
-        # Update the classification
-        ifelse(above, classification <<- f_M_c > threshold, classification <<- f_M_c < threshold)
-
-        # Update charts
+        # Update the threshold, the classification and the charts
+        app_env$threshold <- position[2]
+        update_classification(app_env)
         rlc::updateCharts()
       }
     },
@@ -160,9 +137,9 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
       rlc::mark(rlc::getMarked(chartId="fraction_plot", layerId = "Layer1"), "classification_plot", clear=TRUE)
     }
   )
-
+  
   rlc::lc_hLine(data = rlc::dat(
-    h = threshold
+    h = app_env$threshold
   ),
   addLayer = TRUE,
   transitionDuration = 0,
@@ -176,13 +153,12 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
     width=320,
     height=320,
     rlc::dat(
-      x = embedding[selection,1],
-      y = embedding[selection,2],
-      label = colnames(counts)[selection],
-      colourValue = f_M_c,
-      size = pt_size,
-      on_marked = function() {
-      }),
+      x = app_env$embedding[app_env$selection,1],
+      y = app_env$embedding[app_env$selection,2],
+      label = colnames(app_env$counts)[app_env$selection],
+      colourValue = app_env$f_M_c,
+      size = app_env$pt_size
+      ),
     transitionDuration = 0,
     title = "Fraction",
     chartId = "dimred_frac",
@@ -197,13 +173,13 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
     width=320,
     height=320,
     rlc::dat(
-      x = embedding[selection,1],
-      y = embedding[selection,2],
-      label = colnames(counts)[selection],
-      colourValue = classification,
+      x = app_env$embedding[app_env$selection,1],
+      y = app_env$embedding[app_env$selection,2],
+      label = colnames(app_env$counts)[app_env$selection],
+      colourValue = app_env$classification,
       colourDomain = c(TRUE, FALSE),
       palette = c("green", "red"),
-      size = pt_size,
+      size = app_env$pt_size,
       on_marked = function() {
       }),
     transitionDuration = 0,
@@ -220,13 +196,11 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
     width=320,
     height=320,
     rlc::dat(
-      x = embedding[selection,1],
-      y = embedding[selection,2],
-      label = colnames(counts)[selection],
-      colourValue = counts[marker,selection],
-      size = pt_size,
-      on_marked = function() {
-      }),
+      x = app_env$embedding[app_env$selection,1],
+      y = app_env$embedding[app_env$selection,2],
+      label = colnames(app_env$counts)[app_env$selection],
+      colourValue = app_env$counts[app_env$marker,app_env$selection],
+      size = app_env$pt_size),
     transitionDuration = 0,
     title = "Counts",
     chartId = "additional_data_plot",
@@ -240,31 +214,24 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
   # 1. Which sample is used.
 
   rlc::lc_input(type = "text", label=c(""),
-                rlc::dat(value = sample_select),
+                rlc::dat(value = app_env$sample_select),
                 on_click = function(smp) {
 
                   # Add security check, whether the gene really exists
-                  if (!(smp %in% sample_info$sample)) {
-                    display <<- "Sample does not exist"
-                    rlc::updateCharts()
-                    return()
-                  }
+                  if (!(smp %in% app_env$sample_info$sample)) {
+                    
+                    app_env$display <- "Sample does not exist"
+                    rlc::updateChartsc(c("display_warning"))
+                    
+                  } else {
+                  
+                  update_new_sample(app_env, smp)
 
-                  # Update selected sample
-                  sample_select <<- smp
-                  selection <<- cells$sample==sample_select
-
-                  # Getting the nearest neighbors of all cells in the subset.
-                  correction <<- sample_info %>% dplyr::filter(sample==sample_select) %>% dplyr::pull(correction)
-                  nn_subset <<- list(idx = (nn$idx[selection,] - correction),
-                                     dists = nn$dist[selection,])
-
-                  # Get the average distance for cell_i to x nearest neighbors
-                  avg_dist <<- Matrix::rowMeans(nn_subset$dist[,2:(n_NN+1)])
-
-                  # Update
-                  update_all()
-
+                  smoothed_fraction_wrapper(app_env)
+                  
+                  update_classification(app_env)
+                  
+                  rlc::updateCharts() }
 
                 },
                 place = "sample",
@@ -276,21 +243,25 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
   # 2. Which marker gene is used.
 
   rlc::lc_input(type = "text", label=c(""),
-                rlc::dat(value = marker),
+                rlc::dat(value = app_env$marker),
                 on_click = function(gene) {
 
                   # Add security check, whether the gene really exists
-                  if (!(gene %in% rownames(counts))) {
-                    display <<- "Gene does not exist"
+                  if (!(gene %in% rownames(app_env$counts))) {
+                    
+                    app_env$display <- "Gene does not exist"
                     rlc::updateCharts(c("display_warning"))
-                    return()
-                  }
+                    
+                  } else {
 
                   # Update marker
-                  marker <<- gene
+                  app_env$marker <- gene
 
-                  # Update
-                  update_all()
+                  smoothed_fraction_wrapper(app_env)
+                  
+                  update_classification(app_env) }
+                  
+                  rlc::updateCharts()
 
                 },
                 place = "gene",
@@ -302,34 +273,30 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
   # 3. How many neighbors to consider to show average distance
 
   rlc::lc_input(type = "text",
-                rlc::dat(value = n_NN),
+                rlc::dat(value = app_env$n_NN),
                 on_click = function(n_neighbors) {
 
                   if (!(is.numeric(n_neighbors))) {
-                    display <<- "Enter a number"
+                    app_env$display <- "Enter a number"
                     rlc::updateCharts(c("display_warning"))
                     return()
                   }
 
                   # Checking
                   if (n_neighbors >= k) {
-                    display <<- paste("Neighbors considered must be below", k)
+                    app_env$display <- paste("Neighbors considered must be below", k)
                     rlc::updateCharts(c("display_warning"))
                     return()
                   } else if (n_neighbors < 2) {
-                    display <<- "Neighbors considered must be above 1"
+                    app_env$display <- "Neighbors considered must be above 1"
                     rlc::updateCharts(c("display_warning"))
                     return()
                   }
 
                   # Update how many neighbors to consider
-                  n_NN <<- as.numeric(n_neighbors)
-
-                  # Update k-scores and classification
-                  avg_dist <<- Matrix::rowMeans(nn_subset$dist[,2:(n_NN+1)])
-
-                  # Update display to show no error
-                  display <<- "..."
+                  app_env$n_NN <- as.numeric(n_neighbors)
+                  app_env$avg_dist <- Matrix::rowMeans(app_env$nn_subset$dist[,2:(app_env$n_NN+1)])
+                  app_env$display <- "..."
 
                   # Update the corresponding charts
                   rlc::updateCharts()
@@ -342,29 +309,29 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                 labels = c("")
   )
 
-  # 5. Which gamma correction factor should be used (every chart will have to be updated)
+  # 4. Which gamma correction factor should be used (every chart will have to be updated)
 
   rlc::lc_input(type = "text",
                 on_click = function(g) {
 
                   if (!(is.numeric(g))) {
-                    display <<- "Enter a number"
+                    app_env$display <- "Enter a number"
                     rlc::updateCharts(c("display_warning"))
                     return()
                   }
 
                   # Update gamma
-                  gamma <<- g
-                  f_M_c <<- f_M^gamma
+                  app_env$gamma <- g
+                  app_env$f_M_c <- app_env$f_M^app_env$gamma
 
                   # Update the classification
-                  classification <<- (f_M_c > threshold)
+                  update_classification(app_env)
 
                   # Update charts
                   rlc::updateCharts()
 
                 },
-                rlc::dat(value = gamma),
+                rlc::dat(value = app_env$gamma),
                 chartId = "input_gamma",
                 place = "input_gamma",
                 width = 120,
@@ -372,25 +339,22 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                 labels = c("")
   )
 
-  # 6. Which threshold to use to consider cells as marker expressing ones
+  # 5. Which threshold to use to consider cells as marker expressing ones
 
   rlc::lc_input(type = "text",
-                data = rlc::dat(value = round(threshold, 5)),
+                data = rlc::dat(value = round(app_env$threshold, 5)),
                 on_click = function(thr) {
 
                   if (!(is.numeric(thr))) {
-                    display <<- "Enter a number"
+                    app_env$display <- "Enter a number"
                     rlc::updateCharts(c("display_warning"))
                     return()
                   }
 
-                  # Update the threshold
-                  threshold <<- thr
-                  display <<- "..."
-
-                  # Update the classification
-                  ifelse(above, classification <<- f_M_c > threshold, classification <<- f_M_c < threshold)
-
+                  # Update the threshold and the 
+                  app_env$threshold <- thr
+                  update_classification(app_env)
+                  
                   # Update charts
                   rlc::updateCharts()
 
@@ -402,25 +366,18 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                 labels = c("")
   )
 
-  # xxx. Change between above and below classification
+  # 6. Change between above and below classification
 
   rlc::lc_input(type = "radio", labels = c("Above", "Below"),
                 on_click = function(value) {
 
                   # Check which button was clicked and change to the corresponding embedding
-                  if (value == 1) {
-
-                    above <<- TRUE
-
-                  } else if (value == 2) {
-
-                    above <<- FALSE
-
+                  if (value == 1) { app_env$above <- TRUE
+                  } else if (value == 2) { app_env$above <- FALSE
                   }
 
-                  # Classification
-                  ifelse(above, classification <<- f_M_c > threshold, classification <<- f_M_c < threshold)
-
+                  update_classification(app_env)
+                  
                   # Update the scatterplots
                   rlc::updateCharts()
 
@@ -431,7 +388,7 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                 title = "Select"
   )
 
-  # 11. Change between scatter plot and histogram to show fraction
+  # 7. Change between scatter plot and histogram to show fraction
 
   rlc::lc_input(type = "radio", labels = c("Scatter", "Histogram"),
                 on_click = function(value) {
@@ -447,10 +404,10 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                       width=320,
                       height=320,
                       data = rlc::dat(
-                        x = totals_ci^gamma,
-                        y = f_M_c,
-                        size = pt_size,
-                        colourValue = classification,
+                        x = app_env$totals_ci^app_env$gamma,
+                        y = app_env$f_M_c,
+                        size = app_env$pt_size,
+                        colourValue = app_env$classification,
                         colourDomain = c(TRUE, FALSE),
                         palette = c("green", "red")
                       ),
@@ -460,11 +417,10 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                         if (!(is.na(position[1]))) {
 
                           # Update the threshold
-                          threshold <<- position[2]
+                          app_env$threshold <- position[2]
 
-                          # Update the classification
-                          ifelse(above, classification <<- f_M_c > threshold, classification <<- f_M_c < threshold)
-
+                          update_classification(app_env)
+                          
                           # Update charts
                           rlc::updateCharts()
                         }
@@ -479,7 +435,7 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                     )
 
                     rlc::lc_hLine(data = rlc::dat(
-                      h = threshold
+                      h = app_env$threshold
                     ),
                     addLayer = TRUE,
                     transitionDuration = 0,
@@ -495,7 +451,7 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                       width=320,
                       height=320,
                       data = rlc::dat(
-                        value = f_M_c,
+                        value = app_env$f_M_c,
                         nbins = 100
                       ),
                       on_clickPosition = function(position) {
@@ -504,11 +460,10 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                         if (!(is.na(position[1]))) {
 
                           # Update the threshold
-                          threshold <<- position[1]
+                          app_env$threshold <- position[1]
 
-                          # Update the classification
-                          ifelse(above, classification <<- f_M_c > threshold, classification <<- f_M_c < threshold)
-
+                          update_classification(app_env)
+                          
                           # Update charts
                           rlc::updateCharts()
                         }
@@ -521,7 +476,7 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                     )
 
                     rlc::lc_vLine(data = rlc::dat(
-                      v = threshold
+                      v = app_env$threshold
                     ),
                     addLayer = TRUE,
                     transitionDuration = 0,
@@ -537,38 +492,11 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                 title = "Fraction Plot"
   )
 
-  # 11. Change between different classification plots
+  # 8. Change between different classification plots
 
-  run_classification_ = function() {
-
-    # Get cell types that were assigned in this sample
-    types_sample <- names(g$annotations[[sample_select]])
-
-    # Initialize tibble to store classifications
-    tmp_tibble <- tibble::tibble(
-      barcode = g$annotations[[sample_select]][[1]]$barcode,
-      classification = "none")
-
-    for (type in types_sample) {
-
-      tmp_tibble <- tmp_tibble %>%
-        dplyr::mutate(tmp = g$annotations[[sample_select]][[type]]$all) %>%
-        dplyr::mutate(classification = dplyr::case_when(
-          # ambigious if classification is not nonce and another class is positive for the cell
-          !(classification=="none") & .data$tmp ~ "ambigious",
-          # if classification is nonce and the cell is positive for the class assign the type
-          classification=="none" & .data$tmp ~ type,
-          TRUE ~ classification
-        )) }
-
-      return(tmp_tibble %>% dplyr::pull(classification))
-  }
-
-  # Here is the actual input form
-
-  rlc::lc_input(type = "radio", labels = c("Current Rule", "Current Cell Type", "All Cell Types"),
+  rlc::lc_input(type = "radio", 
+                labels = c("Current Rule", "Current Cell Type", "All Cell Types"),
                 on_click = function(value) {
-
 
                   rlc::removeChart("classification_plot")
 
@@ -581,13 +509,13 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                       width=320,
                       height=320,
                       rlc::dat(
-                        x = embedding[selection,1],
-                        y = embedding[selection,2],
-                        label = colnames(counts)[selection],
-                        colourValue = classification,
+                        x = app_env$embedding[app_env$selection,1],
+                        y = app_env$embedding[app_env$selection,2],
+                        label = colnames(app_env$counts)[app_env$selection],
+                        colourValue = app_env$classification,
                         colourDomain = c(TRUE, FALSE),
                         palette = c("green", "red"),
-                        size = pt_size,
+                        size = app_env$pt_size,
                         on_marked = function() {
                         }),
                       transitionDuration = 0,
@@ -605,13 +533,13 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                       width=320,
                       height=320,
                       rlc::dat(
-                        x = embedding[selection,1],
-                        y = embedding[selection,2],
-                        label = colnames(counts)[selection],
-                        colourValue = g$annotations[[sample_select]][[current_class]]$all,
+                        x = app_env$embedding[app_env$selection,1],
+                        y = app_env$embedding[app_env$selection,2],
+                        label = colnames(app_env$counts)[app_env$selection],
+                        colourValue = g_env$annotations[[app_env$sample_select]][[app_env$current_class]]$all,
                         colourDomain = c(TRUE, FALSE),
                         palette = c("green", "red"),
-                        size = pt_size,
+                        size = app_env$pt_size,
                         on_marked = function() {
                         }),
                       transitionDuration = 0,
@@ -629,13 +557,11 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                       width=320,
                       height=320,
                       rlc::dat(
-                        x = embedding[selection,1],
-                        y = embedding[selection,2],
-                        label = colnames(counts)[selection],
-                        colourValue = run_classification_(),
-                        #colourDomain = c(TRUE, FALSE),
-                        #palette = c("green", "red"),
-                        size = pt_size,
+                        x = app_env$embedding[app_env$selection,1],
+                        y = app_env$embedding[app_env$selection,2],
+                        label = colnames(app_env$counts)[app_env$selection],
+                        colourValue = run_classification(g_env$annotations, app_env$sample_select),
+                        size = app_env$pt_size,
                         on_marked = function() {
                         }),
                       transitionDuration = 0,
@@ -643,9 +569,7 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                       chartId = "classification_plot",
                       place = "classification_plot"
                     )
-
                   }
-
                 },
                 value = 1,
                 width = 200,
@@ -653,7 +577,7 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                 title = "Classification Plot"
   )
 
-  # 11. Change between different additional data plots
+  # 9. Change between different additional data plots
 
   rlc::lc_input(type = "radio", labels = c("Counts Marker", "Library Size"),
                 on_click = function(value) {
@@ -670,13 +594,11 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                       width=320,
                       height=320,
                       rlc::dat(
-                        x = embedding[selection,1],
-                        y = embedding[selection,2],
-                        label = colnames(counts)[selection],
-                        colourValue = counts[marker,selection],
-                        size = pt_size,
-                        on_marked = function() {
-                        }),
+                        x = app_env$embedding[app_env$selection,1],
+                        y = app_env$embedding[app_env$selection,2],
+                        label = colnames(app_env$counts)[app_env$selection],
+                        colourValue = app_env$counts[app_env$marker,app_env$selection],
+                        size = app_env$pt_size),
                       transitionDuration = 0,
                       title = "Counts",
                       chartId = "additional_data_plot",
@@ -692,13 +614,11 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                       width=320,
                       height=320,
                       rlc::dat(
-                        x = embedding[selection,1],
-                        y = embedding[selection,2],
-                        label = colnames(counts)[selection],
-                        colourValue = Matrix::colSums(counts[,selection]),
-                        size = pt_size,
-                        on_marked = function() {
-                        }),
+                        x = app_env$embedding[app_env$selection,1],
+                        y = app_env$embedding[app_env$selection,2],
+                        label = colnames(app_env$counts)[app_env$selection],
+                        colourValue = Matrix::colSums(app_env$counts[,app_env$selection]),
+                        size = app_env$pt_size),
                       transitionDuration = 0,
                       title = "Library Size (total UMI count)",
                       chartId = "additional_data_plot",
@@ -712,59 +632,20 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                 title = "Additional Data Plot"
   )
 
-  ###############################################################################
-
-  # Define update functions
-
-  # Update 1, which includes everything post sample selection
-  # Will need to be called if the whole configuration is not already available
-  update_all = function() {
-
-    # Get the counts for the marker genes for all cells within the selection.
-    c_M <<- counts[marker, selection]
-    counts_ci <<- sapply(1:nrow(nn_subset$idx), function(cell_i){
-      sum(c_M[nn_subset$idx[cell_i,1:k]])
-    })
-
-    c_tot <<- Matrix::colSums(counts[, selection])
-    totals_ci <<- sapply(1:nrow(nn_subset$idx), function(cell_i){
-      sum(c_tot[nn_subset$idx[cell_i,1:k]])
-    })
-
-    # Calculate the fractions
-    f_M <<- counts_ci/totals_ci
-    f_M_c <<- f_M^gamma
-
-    # Default positive classification if above threshold
-    above <<- TRUE
-
-    # Update the classification
-    ifelse(above, classification <<- f_M_c > threshold, classification <<- f_M_c < threshold)
-
-    # Update the display
-    display <<- "..."
-
-    # Update charts
-    rlc::updateCharts()
-  }
-
-
-  # 7. Size of points in the scatter plots
+  # 10. Size of points in the scatter plots
 
   rlc::lc_input(type = "range",
                 on_click = function(pt) {
 
                   # Update point size
-                  pt_size <<- pt
-
-                  # Update the pt size
+                  app_env$pt_size <- pt
                   rlc::updateCharts()
 
                 },
-                rlc::dat(value = pt_size),
+                rlc::dat(value = app_env$pt_size),
                 min = c(1),
                 max = c(4),
-                step=c(1),
+                step=c(0.5),
                 chartId = "input_pt",
                 place = "slide_point_size",
                 width = 240,
@@ -776,64 +657,48 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
 
   # Add html output
 
-  display <- "..."
+  app_env$display <- "..."
 
+  # 1. Display to show warnings
+  
   rlc::lc_html(rlc::dat(
-    content = data.frame(Warning=display)),
+    content = data.frame(Warning=app_env$display)),
     chartId = "display_warning",
     place = "warning"
   )
 
-  # Include display to show classification
-  current_class=NA   # initialize
+  # 2. Display to show classification
+  
+  app_env$current_class=NA   # initialize
 
   rlc::lc_html(rlc::dat(
-    content = tibble::tibble(cell_type=current_class, gene=marker, above=above, gamma=gamma, threshold=threshold)
+    content = tibble::tibble(cell_type=app_env$current_class, 
+                             gene=app_env$marker, above=app_env$above, 
+                             gamma=app_env$gamma, threshold=app_env$threshold)
   ),
   place =  "display_rule"
   )
 
-  # Include display to show all rules in sample
-
-  get_all_rules = function(all_types=FALSE){
-    cell_type <- names(g$rules[[sample_select]])
-
-    display_tibble <- NULL
-
-    for (name in cell_type) {
-      display_tibble <- rbind(display_tibble,
-                              g$rules[[sample_select]][[name]] %>%
-                                dplyr::mutate(cell_type = name)) %>%
-        dplyr::relocate(cell_type)
-    }
-    if (is.null(display_tibble)) {
-      return("No Cell Type / Rule Created")
-    } else if (all_types) {
-      return(display_tibble)
-    }
-    else {
-      return(display_tibble %>% dplyr::filter(cell_type==current_class) %>%
-               dplyr::select(.data$gene, .data$gamma, .data$threshold, .data$above))
-    }
-  }
-
+  # 3. Display to show all rules in sample
+  
   rlc::lc_html(rlc::dat(
-    content = get_all_rules(all_types = TRUE)
+    content = get_all_rules(g_env$rules, app_env$sample_select, all_types=TRUE, app_env$current_class)
   ),
   place =  "rule_sample"
   )
 
-  # Include display to show all rules for the current cell_type
+  # 4. Display to show all rules for the current cell_type
+  
   rlc::lc_html(rlc::dat(
-    content = get_all_rules(all_types = FALSE)
+    content = get_all_rules(g_env$rules, app_env$sample_select, all_types=FALSE, app_env$current_class)
   ),
   place =  "rule_celltype"
   )
 
-  # Include display to show current cell
+  # 5. Display to show current cell
 
   rlc::lc_html(rlc::dat(
-    content = tibble::tibble(Current_Cell = current_class)
+    content = tibble::tibble(Current_Cell = app_env$current_class)
   ),
   place =  "current_cell"
   )
@@ -843,36 +708,37 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
   # Create 2 list to store
 
   # a) annotations per cell type as tibble with barcodes, and rules as columns
-  g$annotations <- vector(mode = "list", length=length(sample_info$sample))
-  names(g$annotations) <- sample_info$sample
+  g_env$annotations <- vector(mode = "list", length=length(app_env$sample_info$sample))
+  names(g_env$annotations) <- app_env$sample_info$sample
 
   # b) rules per cell type as names vector with gene, gamma, threshold, above
-  g$rules <- vector(mode = "list", length=length(sample_info$sample))
-  names(g$rules) <- sample_info$sample
+  g_env$rules <- vector(mode = "list", length=length(app_env$sample_info$sample))
+  names(g_env$rules) <- app_env$sample_info$sample
 
   # Create empty list for each samples
-  for (smp in sample_info$sample) {
-    g$annotations[[smp]] <- vector(mode="list")
-    g$rules[[smp]] <- vector(mode="list")
+  for (smp in app_env$sample_info$sample) {
+    g_env$annotations[[smp]] <- vector(mode="list")
+    g_env$rules[[smp]] <- vector(mode="list")
   }
 
   # Defining a new cell type
   rlc::lc_input(type = "text",
                 width=240,
-                data = rlc::dat(value = ifelse(is.na(current_class), "", current_class)),
+                data = rlc::dat(
+                  value = ifelse(is.na(app_env$current_class), "", app_env$current_class)),
                 on_click = function(ct) {
 
                   if (!(is.character(ct))) {
-                    display <<- "Enter a string"
+                    app_env$display <- "Enter a string"
                     rlc::updateCharts(c("display_warning"))
                     return()
                   } else if (ct == "") {
-                    display <<- "Name cannot be empty"
+                    app_env$display <- "Name cannot be empty"
                     rlc::updateCharts(c("display_warning"))
                     return()
                   }
 
-                  current_class <<- ct
+                  app_env$current_class <- ct
 
                 },
                 chartId = "input_class",
@@ -902,67 +768,67 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
            labels = c("Add Rule"),
            on_click = function(value) {
 
-             if (is.na(current_class)) {
-               display <<- "Cannot add rule without class"
+             if (is.na(app_env$current_class)) {
+               app_env$display <- "Cannot add rule without class"
                rlc::updateCharts(c("display_warning"))
                return()
              } else {
-               display <<- "..."
+               app_env$display <- "..."
                rlc::updateCharts(c("display_warning"))
              }
 
              # Only initiate a new tibble if the cell type has not been used
-             if (!(current_class %in% names(g$annotations[[sample_select]]))) {
+             if (!(app_env$current_class %in% names(g_env$annotations[[app_env$sample_select]]))) {
 
                # Initialize new tibble
-               g$annotations[[sample_select]][[current_class]] <- tibble::tibble(
-                 barcode = colnames(counts[,selection])
+               g_env$annotations[[app_env$sample_select]][[app_env$current_class]] <- tibble::tibble(
+                 barcode = colnames(app_env$counts[,app_env$selection])
                )
 
                # Adding new column with the currently selected gene and its classification
-               g$annotations[[sample_select]][[current_class]][marker] <- classification
+               g_env$annotations[[app_env$sample_select]][[app_env$current_class]][app_env$marker] <- app_env$classification
 
                # Adding the rule data
-               g$rules[[sample_select]][[current_class]] <- tibble::tibble(
-                 gene = marker,
-                 gamma = gamma,
-                 threshold = threshold,
-                 above = above
+               g_env$rules[[app_env$sample_select]][[app_env$current_class]] <- tibble::tibble(
+                 gene = app_env$marker,
+                 gamma = app_env$gamma,
+                 threshold = app_env$threshold,
+                 above = app_env$above
                )
              }
 
              # Check whether a rule has been created before for the given gene
-             if (marker %in% g$rules[[sample_select]][[current_class]]$gene) # update the tibble
+             if (app_env$marker %in% g_env$rules[[app_env$sample_select]][[app_env$current_class]]$gene) # update the tibble
                {
-               g$rules[[sample_select]][[current_class]] <- g$rules[[sample_select]][[current_class]] %>%
+               g_env$rules[[app_env$sample_select]][[app_env$current_class]] <- g_env$rules[[app_env$sample_select]][[app_env$current_class]] %>%
                  dplyr::rows_update(tibble::tibble(
-                   gene = marker,
-                   gamma = gamma,
-                   threshold = threshold,
-                   above = above
+                   gene = app_env$marker,
+                   gamma = app_env$gamma,
+                   threshold = app_env$threshold,
+                   above = app_env$above
                  ))
 
 
              } else # Append the new rule for the new gene
              {
-               g$rules[[sample_select]][[current_class]] <- g$rules[[sample_select]][[current_class]] %>%
+               g_env$rules[[app_env$sample_select]][[app_env$current_class]] <- g_env$rules[[app_env$sample_select]][[app_env$current_class]] %>%
                  dplyr::add_row(
-                   gene = marker,
-                   gamma = gamma,
-                   threshold = threshold,
-                   above = above
+                   gene = app_env$marker,
+                   gamma = app_env$gamma,
+                   threshold = app_env$threshold,
+                   above = app_env$above
                  )
              }
 
              # Initializing or resetting the all column
-             g$annotations[[sample_select]][[current_class]]["all"] <- rep(NULL, length(classification))
+             g_env$annotations[[app_env$sample_select]][[app_env$current_class]]["all"] <- rep(NULL, length(app_env$classification))
 
-             g$annotations[[sample_select]][[current_class]][marker] <- classification
+             g_env$annotations[[app_env$sample_select]][[app_env$current_class]][app_env$marker] <- app_env$classification
 
-             c_names <- colnames(g$annotations[[sample_select]][[current_class]])
+             c_names <- colnames(g_env$annotations[[app_env$sample_select]][[app_env$current_class]])
 
              # For checking whether a cell adheres to all rules we have to check all column (=genes) are TRUE
-             g$annotations[[sample_select]][[current_class]] <- g$annotations[[sample_select]][[current_class]] %>%
+             g_env$annotations[[app_env$sample_select]][[app_env$current_class]] <- g_env$annotations[[app_env$sample_select]][[app_env$current_class]] %>%
                dplyr::rowwise() %>%
                dplyr::mutate(all = all(dplyr::c_across(cols = setdiff(c_names, c("barcode", "all"))))) # select all columns but barcode & all
 
@@ -981,32 +847,41 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                 title = "Delete Rule for Gene:",
                 on_click = function(value) {
 
-                  if(value %in% dplyr::pull(g$rules[[sample_select]][[current_class]], .data$gene)) {
+                  if(value %in% dplyr::pull(g_env$rules[[app_env$sample_select]][[app_env$current_class]], .data$gene)) {
 
-                    g$rules[[sample_select]][[current_class]] <- g$rules[[sample_select]][[current_class]] %>%
+                    g_env$rules[[app_env$sample_select]][[app_env$current_class]] <- g_env$rules[[app_env$sample_select]][[app_env$current_class]] %>%
                       dplyr::filter(.data$gene != value)
 
-                    g$annotations[[sample_select]][[current_class]] <- g$annotations[[sample_select]][[current_class]] %>%
+                    g_env$annotations[[app_env$sample_select]][[app_env$current_class]] <- g_env$annotations[[app_env$sample_select]][[app_env$current_class]] %>%
                       dplyr::select(-dplyr::matches(value))
 
                     # Check whether rules are left
-                    if (length(setdiff(colnames(g$annotations[[sample_select]][[current_class]]), c("barcode", "all"))) == 0) {
-                      g$annotations[[sample_select]][[current_class]] <- g$annotations[[sample_select]][[current_class]] %>%
+                    if (length(setdiff(colnames(g_env$annotations[[app_env$sample_select]][[app_env$current_class]]), c("barcode", "all"))) == 0) {
+                      g_env$annotations[[app_env$sample_select]][[app_env$current_class]] <- g_env$annotations[[app_env$sample_select]][[app_env$current_class]] %>%
                         dplyr::mutate(all = FALSE)
                     } else # Reevaluate all columns as done above
                       {
-                      g$annotations[[sample_select]][[current_class]] <- g$annotations[[sample_select]][[current_class]] %>%
+                      g_env$annotations[[app_env$sample_select]][[app_env$current_class]] <- g_env$annotations[[app_env$sample_select]][[app_env$current_class]] %>%
                         dplyr::rowwise() %>%
                         dplyr::mutate(all = all(dplyr::c_across(cols = setdiff(colnames(.data), c("barcode", "all")))))
                     }
 
                     # Update
-                    update_all()
+                    smoothed_fraction_wrapper(app_env)
+                    update_classification(app_env)
+                    rlc::updateCharts()
+                    
+                    
                   } else {
                     print("evaluates to FALSE")
-                    display <<- "No rule for this gene"
+                    app_env$display <- "No rule for this gene"
                   }
                   rlc::updateCharts()
                 },
                 place = "delete_rule")
+  
+  # tmp
+  g_env$tmp <- app_env
 }
+
+
