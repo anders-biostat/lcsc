@@ -4,7 +4,7 @@
 \alias{run_classification}
 \title{Generate nearest neighbor per sample}
 \usage{
-run_classification(annotations)
+run_classification(annotations, sample_select)
 }
 \arguments{
 \item{annotations}{list created by lc_vis}

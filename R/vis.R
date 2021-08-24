@@ -40,7 +40,7 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
   app_env$selection <- cells$sample==app_env$sample_select
 
   # Getting the nearest neighbors of all cells in the subset.
-  app_env$correction <- app_env$sample_info %>% dplyr::filter(sample==app_env$sample_select) %>% dplyr::pull(correction)
+  app_env$correction <- app_env$sample_info %>% dplyr::filter(sample==app_env$sample_select) %>% dplyr::pull(.data$correction)
   app_env$nn_subset <- list(idx = (app_env$nn$idx[app_env$selection,] - app_env$correction),
                     dists = app_env$nn$dist[app_env$selection,])
 
@@ -221,7 +221,7 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                   if (!(smp %in% app_env$sample_info$sample)) {
                     
                     app_env$display <- "Sample does not exist"
-                    rlc::updateChartsc(c("display_warning"))
+                    rlc::updateCharts(c("display_warning"))
                     
                   } else {
                   
@@ -728,12 +728,7 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                   value = ifelse(is.na(app_env$current_class), "", app_env$current_class)),
                 on_click = function(ct) {
 
-                  if (!(is.character(ct))) {
-                    app_env$display <- "Enter a string"
-                    rlc::updateCharts(c("display_warning"))
-                    return()
-                  } else if (ct == "") {
-                    app_env$display <- "Name cannot be empty"
+                  if (!check_cell_type(ct, app_env)) {
                     rlc::updateCharts(c("display_warning"))
                     return()
                   }
@@ -769,18 +764,21 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
            on_click = function(value) {
 
              if (is.na(app_env$current_class)) {
+               
                app_env$display <- "Cannot add rule without class"
                rlc::updateCharts(c("display_warning"))
                return()
+               
              } else {
+               
                app_env$display <- "..."
                rlc::updateCharts(c("display_warning"))
+               
              }
 
              # Only initiate a new tibble if the cell type has not been used
              if (!(app_env$current_class %in% names(g_env$annotations[[app_env$sample_select]]))) {
 
-               # Initialize new tibble
                g_env$annotations[[app_env$sample_select]][[app_env$current_class]] <- tibble::tibble(
                  barcode = colnames(app_env$counts[,app_env$selection])
                )
@@ -796,9 +794,8 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                  above = app_env$above
                )
              }
-
              # Check whether a rule has been created before for the given gene
-             if (app_env$marker %in% g_env$rules[[app_env$sample_select]][[app_env$current_class]]$gene) # update the tibble
+             else if (app_env$marker %in% g_env$rules[[app_env$sample_select]][[app_env$current_class]]$gene) # update the tibble
                {
                g_env$rules[[app_env$sample_select]][[app_env$current_class]] <- g_env$rules[[app_env$sample_select]][[app_env$current_class]] %>%
                  dplyr::rows_update(tibble::tibble(
@@ -809,7 +806,9 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                  ))
 
 
-             } else # Append the new rule for the new gene
+             } 
+             # Append the new rule for the new gene
+             else
              {
                g_env$rules[[app_env$sample_select]][[app_env$current_class]] <- g_env$rules[[app_env$sample_select]][[app_env$current_class]] %>%
                  dplyr::add_row(
@@ -821,16 +820,14 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
              }
 
              # Initializing or resetting the all column
-             g_env$annotations[[app_env$sample_select]][[app_env$current_class]]["all"] <- rep(NULL, length(app_env$classification))
-
              g_env$annotations[[app_env$sample_select]][[app_env$current_class]][app_env$marker] <- app_env$classification
-
              c_names <- colnames(g_env$annotations[[app_env$sample_select]][[app_env$current_class]])
-
-             # For checking whether a cell adheres to all rules we have to check all column (=genes) are TRUE
-             g_env$annotations[[app_env$sample_select]][[app_env$current_class]] <- g_env$annotations[[app_env$sample_select]][[app_env$current_class]] %>%
-               dplyr::rowwise() %>%
-               dplyr::mutate(all = all(dplyr::c_across(cols = setdiff(c_names, c("barcode", "all"))))) # select all columns but barcode & all
+             
+             # For checking whether a cell adheres to all rules we have to check whether all column (=genes) are TRUE
+             tmp <- g_env$annotations[[app_env$sample_select]][[app_env$current_class]] %>%
+               dplyr::select(setdiff(c_names, c("barcode", "all")))
+             all_classification <- apply(tmp, MARGIN=1, FUN=all)
+             g_env$annotations[[app_env$sample_select]][[app_env$current_class]]["all"] <- all_classification
 
              rlc::updateCharts()
 
@@ -861,9 +858,11 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                         dplyr::mutate(all = FALSE)
                     } else # Reevaluate all columns as done above
                       {
-                      g_env$annotations[[app_env$sample_select]][[app_env$current_class]] <- g_env$annotations[[app_env$sample_select]][[app_env$current_class]] %>%
-                        dplyr::rowwise() %>%
-                        dplyr::mutate(all = all(dplyr::c_across(cols = setdiff(colnames(.data), c("barcode", "all")))))
+                        c_names <- colnames(g_env$annotations[[app_env$sample_select]][[app_env$current_class]])
+                        tmp <- g_env$annotations[[app_env$sample_select]][[app_env$current_class]] %>%
+                          dplyr::select(setdiff(c_names, c("barcode", "all")))
+                        all_classification <- apply(tmp, MARGIN=1, FUN=all)
+                        g_env$annotations[[app_env$sample_select]][[app_env$current_class]]["all"] <- all_classification
                     }
 
                     # Update

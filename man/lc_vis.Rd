@@ -9,15 +9,15 @@ lc_vis(cells, counts, pc_space, embedding, nn, k = 50)
 \arguments{
 \item{cells}{data.frame with cell metadata}
 
-\item{counts}{count matrix (cols = cells, genes = rows)}
+\item{counts}{sparse count matrix (cols = cells, genes = rows)}
 
-\item{pc_space}{PCA coordinates}
+\item{pc_space}{PCA coordinates (cols = coordiantes, rows = cells)}
 
-\item{embedding}{coordinates for two-dimensional embedding}
+\item{embedding}{coordinates for two-dimensional embedding (cols = coordiantes, rows = cells)}
 
-\item{nn}{list containing nearest neighbor information}
+\item{nn}{list containing nearest neighbor information (created by run_nn function)}
 
-\item{k}{number of neighbors considered for smoothing}
+\item{k}{number of neighbors considered for smoothing (default k = 50)}
 }
 \description{
 Visualize and annotate single cell data
