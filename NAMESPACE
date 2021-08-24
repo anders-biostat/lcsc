@@ -2,7 +2,6 @@
 
 export(classify_all)
 export(generate_sample_info)
-export(get_all_rules)
 export(lc_vis)
 export(run_nn)
 importFrom(dplyr,"%>%")

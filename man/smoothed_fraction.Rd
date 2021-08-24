@@ -6,6 +6,17 @@
 \usage{
 smoothed_fraction(counts, marker, selection, nn_subset, gamma)
 }
+\arguments{
+\item{counts}{sparse matrix, containing counts (cols = cells, genes = rows)}
+
+\item{marker}{string, selected marker gene}
+
+\item{selection}{logical array, used to subset cells belonging to the selected sample}
+
+\item{nn_subset}{list, nearest neighbor indices and distances for cells in the sample}
+
+\item{gamma}{numeric, gamma-correction factor}
+}
 \description{
 function to calculate the fraction smoothed over nearest neighbors
 }

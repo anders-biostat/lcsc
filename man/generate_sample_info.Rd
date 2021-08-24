@@ -7,7 +7,7 @@
 generate_sample_info(cells)
 }
 \arguments{
-\item{cells}{tibble containing barcodes and corresponding sample}
+\item{cells}{tibble, containing barcodes and corresponding sample}
 }
 \description{
 Generate sample info data frame

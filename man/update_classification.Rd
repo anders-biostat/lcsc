@@ -6,6 +6,9 @@
 \usage{
 update_classification(app_env)
 }
+\arguments{
+\item{app_env}{R environment, app environment}
+}
 \description{
 Update classification
 }

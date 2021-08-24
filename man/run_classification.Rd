@@ -7,7 +7,9 @@
 run_classification(annotations, sample_select)
 }
 \arguments{
-\item{annotations}{list created by lc_vis}
+\item{annotations}{list, created by lc_vis}
+
+\item{sample_select}{string, selected sample which must be in sample_info$sample}
 }
 \description{
 Generate nearest neighbor per sample

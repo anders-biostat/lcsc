@@ -1,19 +1,29 @@
+---
+output: github_document
+---
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.path = "man/figures/README-",
+  out.width = "100%"
+)
+```
 
 # lcsc (linked charts for single cells)
 
 <!-- badges: start -->
-
 <!-- badges: end -->
 
-This package allows you to classify single cells based on
-nearest-neighbor smoothing, not rely on unsupervised learning methods.
+This package allows you to classify single cells based on nearest-neighbor smoothing, 
+not rely on unsupervised learning methods.
 
 ## Installation
 
-You can install the development version from
-[GitHub](https://github.com/) with:
+You can install the development version from [GitHub](https://github.com/) with:
 
 ``` r
 # install.packages("devtools")
@@ -22,11 +32,10 @@ devtools::install_github("anders-biostat/lc-sc")
 
 ## Example
 
-We start of with the standard workflow consisting of quality control,
-normalization, and linear/non-linear dimensional reduction using
-`Seurat`.
+We start of with the standard workflow consisting of quality control, normalization, and
+linear/non-linear dimensional reduction using `Seurat`.
 
-``` r
+```{r setup, eval=F}
 library(dplyr)
 library(Seurat)
 
@@ -44,7 +53,7 @@ pbmc <- RunUMAP(pbmc, dims = 1:30)
 
 Extract the necessary data from the `Seurat` object.
 
-``` r
+```{r data, eval=F}
 # From the Seurat object
 counts <- GetAssayData(pbmc, "counts")
 meta_data <- pbmc[[]]
@@ -59,10 +68,9 @@ cells = tibble::tibble(
 )
 ```
 
-Start the `linked charts` application after generating a nearest
-neighborhood graph per sample.
+Start the `linked charts` application after generating a nearest neighborhood graph per sample.
 
-``` r
+```{r eval=F}
 library(lcsc)
 
 # Build nearest neighborhood graph per sample using nn
@@ -72,7 +80,7 @@ nn <- run_nn(cells, pc_space, k=k, dim=30)
 lc_vis(cells, counts, pc_space, embedding, nn, k=k)
 ```
 
-The application would look like this after selecting macrophages using
-the smoothed expression of CD68.
+The application would look like this after selecting macrophages using the smoothed expression of CD68.
 
 ![](man/figures/pbmc_lcsc_application.png)
+

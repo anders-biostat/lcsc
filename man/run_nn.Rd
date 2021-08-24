@@ -7,13 +7,13 @@
 run_nn(cells, pc_space, k = 50, dim = 30)
 }
 \arguments{
-\item{cells}{data.frame with cell metadata}
+\item{cells}{data.frame, containing cell metadata}
 
-\item{pc_space}{PCA coordinates}
+\item{pc_space}{matrix, containing PCA coordinates (cols = coordiantes, rows = cells)}
 
-\item{k}{number of neighbors considered for smoothing}
+\item{k}{numeric, number of neighbors considered for smoothing (default k = 50)}
 
-\item{dim}{number of PC dimensions used for nearest neighbor graph}
+\item{dim, }{numeric, number of PC dimensions used to compute nearest neighbor graph}
 }
 \description{
 Generate nearest neighbor per sample

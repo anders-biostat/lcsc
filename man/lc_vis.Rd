@@ -7,17 +7,17 @@
 lc_vis(cells, counts, pc_space, embedding, nn, k = 50)
 }
 \arguments{
-\item{cells}{data.frame with cell metadata}
+\item{cells}{data.frame, containing cell metadata}
 
-\item{counts}{sparse count matrix (cols = cells, genes = rows)}
+\item{counts}{sparse matrix, containing counts (cols = cells, genes = rows)}
 
-\item{pc_space}{PCA coordinates (cols = coordiantes, rows = cells)}
+\item{pc_space}{matrix, containing PCA coordinates (cols = coordiantes, rows = cells)}
 
-\item{embedding}{coordinates for two-dimensional embedding (cols = coordiantes, rows = cells)}
+\item{embedding}{matrix, containing coordinates for two-dimensional embedding (cols = coordiantes, rows = cells)}
 
-\item{nn}{list containing nearest neighbor information (created by run_nn function)}
+\item{nn}{list, containing nearest neighbor information (created by run_nn function)}
 
-\item{k}{number of neighbors considered for smoothing (default k = 50)}
+\item{k}{numeric, number of neighbors considered for smoothing (default k = 50)}
 }
 \description{
 Visualize and annotate single cell data

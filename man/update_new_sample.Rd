@@ -6,6 +6,11 @@
 \usage{
 update_new_sample(app_env, smp)
 }
+\arguments{
+\item{app_env}{R environment, app enviroment}
+
+\item{smp}{string, selected sample}
+}
 \description{
 Update upon selection of new sample
 }

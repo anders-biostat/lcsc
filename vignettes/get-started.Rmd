@@ -1,5 +1,21 @@
+---
+title: "get-started"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{get-started}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
 
-# How to get started with lcsc
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+
+# How to get started with lcsc (linked charts for single cells)
 
 As in the Guided Clustering Tutorial by Seurat, we will be using the PBMC dataset from 10X containing
 2,700 single cells that were sequenced on the Illumina NextSeq 500. The raw data are made availbe by 10X [here](https://cf.10xgenomics.com/samples/cell/pbmc3k/pbmc3k_filtered_gene_bc_matrices.tar.gz).
@@ -24,9 +40,9 @@ pbmc <- FindVariableFeatures(pbmc, selection.method = "vst", nfeatures = 2000)
 all.genes <- rownames(pbmc)
 pbmc <- ScaleData(pbmc, features = all.genes)
 pbmc <- RunPCA(pbmc, features = VariableFeatures(object = pbmc))
-pbmc <- FindNeighbors(pbmc, dims = 1:10)
+pbmc <- FindNeighbors(pbmc, dims = 1:20)
 pbmc <- FindClusters(pbmc, resolution = 0.5)
-pbmc <- RunUMAP(pbmc, dims = 1:10)
+pbmc <- RunUMAP(pbmc, dims = 1:20)
 ```
 
 To run lcsc we need the following data:
@@ -71,5 +87,5 @@ lc_vis(cells=cells,
 
 The broad classification could look like this:
 
-![](../img/screenshot_get_started_01.png) 
+![](../man/figures/pbmc_lcsc_application.png){width=1000px}
 

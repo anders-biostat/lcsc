@@ -6,6 +6,11 @@
 \usage{
 check_cell_type(ct, app_env)
 }
+\arguments{
+\item{ct}{string, cell type input by user}
+
+\item{app_env}{R environment, app enviroment}
+}
 \description{
 Checking whether a valid cell type was supplied by the user
 }

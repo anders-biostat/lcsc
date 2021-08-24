@@ -5,12 +5,12 @@
 #' @importFrom dplyr %>%
 #' @importFrom rlang .data
 #' 
-#' @param cells data.frame with cell metadata
-#' @param counts sparse count matrix (cols = cells, genes = rows)
-#' @param pc_space PCA coordinates (cols = coordiantes, rows = cells)
-#' @param embedding coordinates for two-dimensional embedding (cols = coordiantes, rows = cells)
-#' @param nn list containing nearest neighbor information (created by run_nn function)
-#' @param k number of neighbors considered for smoothing (default k = 50)
+#' @param cells data.frame, containing cell metadata
+#' @param counts sparse matrix, containing counts (cols = cells, genes = rows)
+#' @param pc_space matrix, containing PCA coordinates (cols = coordiantes, rows = cells)
+#' @param embedding matrix, containing coordinates for two-dimensional embedding (cols = coordiantes, rows = cells)
+#' @param nn list, containing nearest neighbor information (created by run_nn function)
+#' @param k numeric, number of neighbors considered for smoothing (default k = 50)
 #' 
 #' @export
 lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
@@ -560,7 +560,7 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                         x = app_env$embedding[app_env$selection,1],
                         y = app_env$embedding[app_env$selection,2],
                         label = colnames(app_env$counts)[app_env$selection],
-                        colourValue = run_classification(g_env$annotations, app_env$sample_select),
+                        colourValue = run_classification(g_env$annotations, app_env$sample_select, app_env),
                         size = app_env$pt_size,
                         on_marked = function() {
                         }),
@@ -764,73 +764,34 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
            on_click = function(value) {
 
              if (is.na(app_env$current_class)) {
-               
                app_env$display <- "Cannot add rule without class"
                rlc::updateCharts(c("display_warning"))
                return()
                
              } else {
-               
                app_env$display <- "..."
                rlc::updateCharts(c("display_warning"))
-               
              }
 
              # Only initiate a new tibble if the cell type has not been used
              if (!(app_env$current_class %in% names(g_env$annotations[[app_env$sample_select]]))) {
-
-               g_env$annotations[[app_env$sample_select]][[app_env$current_class]] <- tibble::tibble(
-                 barcode = colnames(app_env$counts[,app_env$selection])
-               )
-
-               # Adding new column with the currently selected gene and its classification
-               g_env$annotations[[app_env$sample_select]][[app_env$current_class]][app_env$marker] <- app_env$classification
-
-               # Adding the rule data
-               g_env$rules[[app_env$sample_select]][[app_env$current_class]] <- tibble::tibble(
-                 gene = app_env$marker,
-                 gamma = app_env$gamma,
-                 threshold = app_env$threshold,
-                 above = app_env$above
-               )
+               update_new_class(g_env, app_env)
              }
-             # Check whether a rule has been created before for the given gene
-             else if (app_env$marker %in% g_env$rules[[app_env$sample_select]][[app_env$current_class]]$gene) # update the tibble
-               {
-               g_env$rules[[app_env$sample_select]][[app_env$current_class]] <- g_env$rules[[app_env$sample_select]][[app_env$current_class]] %>%
-                 dplyr::rows_update(tibble::tibble(
-                   gene = app_env$marker,
-                   gamma = app_env$gamma,
-                   threshold = app_env$threshold,
-                   above = app_env$above
-                 ))
-
-
+             # If there was a rule before for the marker, update the rule
+             else if (app_env$marker %in% g_env$rules[[app_env$sample_select]][[app_env$current_class]]$gene) {
+               update_rule(g_env, app_env)
              } 
-             # Append the new rule for the new gene
-             else
-             {
-               g_env$rules[[app_env$sample_select]][[app_env$current_class]] <- g_env$rules[[app_env$sample_select]][[app_env$current_class]] %>%
-                 dplyr::add_row(
-                   gene = app_env$marker,
-                   gamma = app_env$gamma,
-                   threshold = app_env$threshold,
-                   above = app_env$above
-                 )
+             # If there was no rule before for the marker, create append the rule
+             else {
+               add_rules(g_env, app_env)
              }
-
-             # Initializing or resetting the all column
-             g_env$annotations[[app_env$sample_select]][[app_env$current_class]][app_env$marker] <- app_env$classification
-             c_names <- colnames(g_env$annotations[[app_env$sample_select]][[app_env$current_class]])
              
-             # For checking whether a cell adheres to all rules we have to check whether all column (=genes) are TRUE
-             tmp <- g_env$annotations[[app_env$sample_select]][[app_env$current_class]] %>%
-               dplyr::select(setdiff(c_names, c("barcode", "all")))
-             all_classification <- apply(tmp, MARGIN=1, FUN=all)
-             g_env$annotations[[app_env$sample_select]][[app_env$current_class]]["all"] <- all_classification
-
+             g_env$annotations[[app_env$sample_select]][[app_env$current_class]][app_env$marker] <- app_env$classification
+             
+             update_annotation(g_env, app_env)
+             
              rlc::updateCharts()
-
+             
            },
            place = "button_rule")
 
@@ -852,34 +813,22 @@ lc_vis <- function(cells, counts, pc_space, embedding, nn, k=50){
                     g_env$annotations[[app_env$sample_select]][[app_env$current_class]] <- g_env$annotations[[app_env$sample_select]][[app_env$current_class]] %>%
                       dplyr::select(-dplyr::matches(value))
 
-                    # Check whether rules are left
-                    if (length(setdiff(colnames(g_env$annotations[[app_env$sample_select]][[app_env$current_class]]), c("barcode", "all"))) == 0) {
-                      g_env$annotations[[app_env$sample_select]][[app_env$current_class]] <- g_env$annotations[[app_env$sample_select]][[app_env$current_class]] %>%
-                        dplyr::mutate(all = FALSE)
-                    } else # Reevaluate all columns as done above
-                      {
-                        c_names <- colnames(g_env$annotations[[app_env$sample_select]][[app_env$current_class]])
-                        tmp <- g_env$annotations[[app_env$sample_select]][[app_env$current_class]] %>%
-                          dplyr::select(setdiff(c_names, c("barcode", "all")))
-                        all_classification <- apply(tmp, MARGIN=1, FUN=all)
-                        g_env$annotations[[app_env$sample_select]][[app_env$current_class]]["all"] <- all_classification
-                    }
+                    update_annotation(g_env, app_env)
 
                     # Update
-                    smoothed_fraction_wrapper(app_env)
                     update_classification(app_env)
                     rlc::updateCharts()
                     
-                    
                   } else {
-                    print("evaluates to FALSE")
                     app_env$display <- "No rule for this gene"
                   }
+                  
                   rlc::updateCharts()
+                  
                 },
                 place = "delete_rule")
   
-  # tmp
+  # Debugging TODO: Remove
   g_env$tmp <- app_env
 }
 

@@ -8,7 +8,7 @@ Authors@R:
            email = "philipp.schaefer@stud.uni-heidelberg.de",
            comment = c(ORCID = "YOUR-ORCID-ID"))
 Description: Classification of single cells based on nearest-neighbor smoothing which does not rely on unsupervised learning methods.
-License: which_license?
+License: GPL (>= 3)
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
@@ -21,7 +21,10 @@ Imports:
 	RANN,
 	rlang
 Suggests: 
+    rmarkdown,
+    knitr,
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
 Depends: 
     R (>= 2.10)
+VignetteBuilder: knitr

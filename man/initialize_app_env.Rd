@@ -6,6 +6,21 @@
 \usage{
 initialize_app_env(app_env, cells, counts, pc_space, embedding, nn, k)
 }
+\arguments{
+\item{app_env}{R environment, app enviroment}
+
+\item{cells}{data.frame, containing cell metadata}
+
+\item{counts}{sparse matrix, containing counts (cols = cells, genes = rows)}
+
+\item{pc_space}{matrix, containing PCA coordinates (cols = coordiantes, rows = cells)}
+
+\item{embedding}{matrix, containing coordinates for two-dimensional embedding (cols = coordiantes, rows = cells)}
+
+\item{nn}{list, containing nearest neighbor information (created by run_nn function)}
+
+\item{k}{numeric, number of neighbors considered for smoothing (default k = 50)}
+}
 \description{
 Populate the app environment
 }

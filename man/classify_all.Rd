@@ -7,7 +7,7 @@
 classify_all(annotations)
 }
 \arguments{
-\item{annotations}{list created by lc_vis}
+\item{annotations}{list, created by lc_vis}
 }
 \description{
 Generate nearest neighbor per sample

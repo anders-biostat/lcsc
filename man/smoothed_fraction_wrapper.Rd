@@ -6,6 +6,9 @@
 \usage{
 smoothed_fraction_wrapper(app_env)
 }
+\arguments{
+\item{app_env}{R environment, app enviroment}
+}
 \description{
 Wrapper calling smoothed_fraction function and adding the result to the app environment
 }

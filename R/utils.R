@@ -1,7 +1,7 @@
 #' Generate sample info data frame
 #' @name generate_sample_info
 #' @importFrom dplyr %>%
-#' @param cells tibble containing barcodes and corresponding sample
+#' @param cells tibble, containing barcodes and corresponding sample
 #' @export
 generate_sample_info <- function(cells) {
   tibble::tibble(sample = unique(cells$sample)) %>%
@@ -16,11 +16,14 @@ generate_sample_info <- function(cells) {
 
 #' Generate nearest neighbor per sample
 #' @name run_nn
+#' 
 #' @importFrom dplyr %>%
-#' @param cells data.frame with cell metadata
-#' @param pc_space PCA coordinates
-#' @param k number of neighbors considered for smoothing
-#' @param dim number of PC dimensions used for nearest neighbor graph
+#' 
+#' @param cells data.frame, containing cell metadata
+#' @param pc_space matrix, containing PCA coordinates (cols = coordiantes, rows = cells)
+#' @param k numeric, number of neighbors considered for smoothing (default k = 50)
+#' @param dim, numeric, number of PC dimensions used to compute nearest neighbor graph
+#' 
 #' @export
 run_nn <- function(cells, pc_space, k=50, dim=30) {
   
@@ -55,16 +58,22 @@ run_nn <- function(cells, pc_space, k=50, dim=30) {
 
 #' Generate nearest neighbor per sample
 #' @name run_classification
+#' 
 #' @importFrom dplyr %>%
-#' @param annotations list created by lc_vis
-run_classification = function(annotations, sample_select) {
-  # Get cell types that were assigned in this sample
-  types_sample <- names(annotations[[sample_select]])
+#' 
+#' @param annotations list, created by lc_vis
+#' @param sample_select string, selected sample which must be in sample_info$sample
+#' @param app_env R environment, app environment
+#' 
+run_classification = function(annotations, sample_select, app_env) {
   
   # Initialize tibble to store classifications
   tmp_tibble <- tibble::tibble(
-    barcode = annotations[[sample_select]][[1]]$barcode,
+    barcode = colnames(app_env$counts[,app_env$selection]),
     classification = "none")
+    
+  # Get cell types that were assigned in this sample
+  types_sample <- names(annotations[[sample_select]])
   
   for (type in types_sample) {
     
@@ -83,8 +92,9 @@ run_classification = function(annotations, sample_select) {
 
 #' Generate nearest neighbor per sample
 #' @name classify_all
-#' @importFrom dplyr %>%
-#' @param annotations list created by lc_vis
+#' 
+#' @param annotations list, created by lc_vis
+#' 
 #' @export
 classify_all = function(annotations) {
 
@@ -108,8 +118,14 @@ classify_all = function(annotations) {
 #' Function to get all rules in a given sample
 #' @importFrom dplyr %>%
 #' @importFrom rlang .data
+#' 
 #' @name get_all_rules
-#' @export
+#' 
+#' @param rules list, containing the created rules for each sample for each cell type
+#' @param sample_select string, selected sample which must be in sample_info$sample
+#' @param all_types logical, TRUE: return rules for all cell types in sample, FALSE: returns rules for current cell type
+#' @param current_class string, currently selected cell type
+#' 
 get_all_rules = function(rules, sample_select, all_types, current_class){
   
   cell_type <- names(rules[[sample_select]])
@@ -134,6 +150,15 @@ get_all_rules = function(rules, sample_select, all_types, current_class){
 }
 
 #' Populate the app environment
+#' @name initialize_app_env
+#' 
+#' @param app_env R environment, app enviroment
+#' @param cells data.frame, containing cell metadata
+#' @param counts sparse matrix, containing counts (cols = cells, genes = rows)
+#' @param pc_space matrix, containing PCA coordinates (cols = coordiantes, rows = cells)
+#' @param embedding matrix, containing coordinates for two-dimensional embedding (cols = coordiantes, rows = cells)
+#' @param nn list, containing nearest neighbor information (created by run_nn function)
+#' @param k numeric, number of neighbors considered for smoothing (default k = 50)
 #' 
 initialize_app_env = function(app_env, cells, counts, pc_space, embedding, nn, k) {
   app_env$cells <- cells
@@ -145,6 +170,10 @@ initialize_app_env = function(app_env, cells, counts, pc_space, embedding, nn, k
 
 #' Checking whether a valid cell type was supplied by the user
 #' @name check_cell_type
+#' 
+#' @param ct string, cell type input by user
+#' @param app_env R environment, app enviroment
+#' 
 check_cell_type = function(ct, app_env) {
   if (!(is.character(ct))) {
     

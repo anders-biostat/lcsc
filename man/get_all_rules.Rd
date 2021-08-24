@@ -6,6 +6,15 @@
 \usage{
 get_all_rules(rules, sample_select, all_types, current_class)
 }
+\arguments{
+\item{rules}{list, containing the created rules for each sample for each cell type}
+
+\item{sample_select}{string, selected sample which must be in sample_info$sample}
+
+\item{all_types}{logical, TRUE: return rules for all cell types in sample, FALSE: returns rules for current cell type}
+
+\item{current_class}{string, currently selected cell type}
+}
 \description{
 Function to get all rules in a given sample
 }
