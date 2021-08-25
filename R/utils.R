@@ -99,16 +99,38 @@ run_classification = function(annotations, sample_select, app_env) {
 classify_all = function(annotations) {
 
   # Initialize list to store all classifications
-  ann_list <- vector(mode = "list", length=length(names(annotations)))
+  ann_list <- list()
 
   for (smp in names(annotations)) {
     
     # Check whether there are actually annotations
     if (length(annotations[[smp]])>0) {
 
+      # Initialize tibble to store classifications
+      tmp_tibble <- tibble::tibble(
+        barcode = annotations[[smp]][[1]]$barcode,
+        classification = "none")
+      
+      # Get cell types that were assigned in this sample
+      types_sample <- names(annotations[[smp]])
+      
+      for (type in types_sample) {
+        
+        tmp_tibble <- tmp_tibble %>%
+          dplyr::mutate(tmp = annotations[[smp]][[type]]$all) %>%
+          dplyr::mutate(classification = dplyr::case_when(
+            # ambigious if classification is not nonce and another class is positive for the cell
+            !(classification=="none") & .data$tmp ~ "ambigious",
+            # if classification is nonce and the cell is positive for the class assign the type
+            classification=="none" & .data$tmp ~ type,
+            TRUE ~ classification
+          )) }
+      
+      class_tmp <- tmp_tibble %>% dplyr::pull(.data$classification)
+      
         ann_list[[smp]] <- tibble::tibble(
           id = annotations[[smp]][[1]]$barcode,
-          classification = run_classification(annotations, smp)
+          classification = class_tmp
         )
       }
     }

@@ -4,12 +4,14 @@
 \alias{run_classification}
 \title{Generate nearest neighbor per sample}
 \usage{
-run_classification(annotations, sample_select)
+run_classification(annotations, sample_select, app_env)
 }
 \arguments{
 \item{annotations}{list, created by lc_vis}
 
 \item{sample_select}{string, selected sample which must be in sample_info$sample}
+
+\item{app_env}{R environment, app environment}
 }
 \description{
 Generate nearest neighbor per sample
