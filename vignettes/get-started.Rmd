@@ -66,7 +66,7 @@ head(cells)
 Furthermore, we need to compute the nearest neighbors per sample, for example using a helper function from the package.
 
 ```{r eval=FALSE}
-devtools::load_all("/home/psls/lcsc/")
+library(lcsc)
 
 k = 50 # Compute 50 nearest neigbors per cell
 nn <- run_nn(cells, pc_space, k=k, dim=30)  # Using 30 principal components to compute NN
