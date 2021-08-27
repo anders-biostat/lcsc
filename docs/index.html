@@ -54,7 +54,7 @@
   </a>
   <ul class="dropdown-menu" role="menu">
 <li>
-      <a href="articles/covid-balf-study.html">Analyzing Covid-19 BALF samples</a>
+      <a href="articles/covid-balf-study.html">Analyzing COVID-19 BALF samples</a>
     </li>
   </ul>
 </li>
@@ -116,12 +116,32 @@
 <span class="co">#&gt; Active assay: RNA (13714 features, 2000 variable features)</span>
 <span class="co">#&gt;  2 dimensional reductions calculated: pca, umap</span></code></pre></div>
 <p>To run the linked-charts for single cells, we need to extract the following data for the <code>Seurat</code> object.</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span class="co"># From the Seurat object</span>
-<span class="va">counts</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://satijalab.org/seurat/reference/AssayData.html">GetAssayData</a></span><span class="op">(</span><span class="va">pbmc</span>, <span class="st">"counts"</span><span class="op">)</span>
+<ol>
+<li>Sparse count matrix (rows = genes, cols = cells)</li>
+</ol>
+<!-- end list --><div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span class="va">counts</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://satijalab.org/seurat/reference/AssayData.html">GetAssayData</a></span><span class="op">(</span><span class="va">pbmc</span>, <span class="st">"counts"</span><span class="op">)</span>
 <span class="fu"><a href="https://rdrr.io/r/base/dim.html">dim</a></span><span class="op">(</span><span class="va">counts</span><span class="op">)</span>
-<span class="co">#&gt; [1] 13714  2700</span>
-<span class="va">meta_data</span> <span class="op">&lt;-</span> <span class="va">pbmc</span><span class="op">[[</span><span class="op">]</span><span class="op">]</span>
+<span class="co">#&gt; [1] 13714  2700</span></code></pre></div>
+<ol>
+<li>PC coordinates</li>
+</ol>
+<!-- end list --><div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span class="va">pc_space</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://satijalab.org/seurat/reference/Embeddings.html">Embeddings</a></span><span class="op">(</span><span class="va">pbmc</span>, <span class="st">"pca"</span><span class="op">)</span>
+<span class="fu"><a href="https://rdrr.io/r/base/dim.html">dim</a></span><span class="op">(</span><span class="va">pc_space</span><span class="op">)</span>
+<span class="co">#&gt; [1] 2700   50</span></code></pre></div>
+<ol>
+<li>Non-linear dimensional reduction embedding (2D)</li>
+</ol>
+<!-- end list --><div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span class="va">embedding</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://satijalab.org/seurat/reference/Embeddings.html">Embeddings</a></span><span class="op">(</span><span class="va">pbmc</span>, <span class="st">"umap"</span><span class="op">)</span>
+<span class="fu"><a href="https://rdrr.io/r/base/dim.html">dim</a></span><span class="op">(</span><span class="va">embedding</span><span class="op">)</span>
+<span class="co">#&gt; [1] 2700    2</span></code></pre></div>
+<ol>
+<li>Cell meta data</li>
+</ol>
+<!-- end list --><div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span class="va">meta_data</span> <span class="op">&lt;-</span> <span class="va">pbmc</span><span class="op">[[</span><span class="op">]</span><span class="op">]</span>
 <span class="fu"><a href="https://rdrr.io/r/utils/head.html">head</a></span><span class="op">(</span><span class="va">meta_data</span><span class="op">)</span>
 <span class="co">#&gt;                  orig.ident nCount_RNA nFeature_RNA percent.mt</span>
 <span class="co">#&gt; AAACATACAACCAC-1     pbmc3k       2419          779  3.0177759</span>
@@ -129,16 +149,10 @@
 <span class="co">#&gt; AAACATTGATCAGC-1     pbmc3k       3147         1129  0.8897363</span>
 <span class="co">#&gt; AAACCGTGCTTCCG-1     pbmc3k       2639          960  1.7430845</span>
 <span class="co">#&gt; AAACCGTGTATGCG-1     pbmc3k        980          521  1.2244898</span>
-<span class="co">#&gt; AAACGCACTGGTAC-1     pbmc3k       2163          781  1.6643551</span>
-<span class="va">pc_space</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://satijalab.org/seurat/reference/Embeddings.html">Embeddings</a></span><span class="op">(</span><span class="va">pbmc</span>, <span class="st">"pca"</span><span class="op">)</span>
-<span class="fu"><a href="https://rdrr.io/r/base/dim.html">dim</a></span><span class="op">(</span><span class="va">pc_space</span><span class="op">)</span>
-<span class="co">#&gt; [1] 2700   50</span>
-<span class="va">embedding</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://satijalab.org/seurat/reference/Embeddings.html">Embeddings</a></span><span class="op">(</span><span class="va">pbmc</span>, <span class="st">"umap"</span><span class="op">)</span>
-<span class="fu"><a href="https://rdrr.io/r/base/dim.html">dim</a></span><span class="op">(</span><span class="va">embedding</span><span class="op">)</span>
-<span class="co">#&gt; [1] 2700    2</span>
-
-<span class="co"># How is the sample column named?</span>
-<span class="va">s</span> <span class="op">=</span> <span class="st">"orig.ident"</span>
+<span class="co">#&gt; AAACGCACTGGTAC-1     pbmc3k       2163          781  1.6643551</span></code></pre></div>
+<p>Based on these meta we will generate the <code>cells</code> that only contains the needed information and will be used to subset the counts according to which sample is selected.</p>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span class="va">s</span> <span class="op">=</span> <span class="st">"orig.ident"</span>  <span class="co"># name of the sample column</span>
 <span class="va">cells</span> <span class="op">=</span> <span class="fu">tibble</span><span class="fu">::</span><span class="fu"><a href="https://tibble.tidyverse.org/reference/tibble.html">tibble</a></span><span class="op">(</span>
   id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/colnames.html">rownames</a></span><span class="op">(</span><span class="va">meta_data</span><span class="op">)</span>,
   sample <span class="op">=</span> <span class="va">meta_data</span><span class="op">[[</span><span class="va">s</span><span class="op">]</span><span class="op">]</span>
@@ -158,7 +172,7 @@
 <span class="co">#&gt; 6 AAACGCACTGGTAC-1 pbmc3k</span></code></pre></div>
 <p>Additionally we need to generate the neighborhood graph per sample containing the <code>k</code> nearest neighbors for each cell. For the computation the <code>lcsc</code> package provides the <code>run_nn</code> function, which also takes the number of pc_dimensions (<code>dim</code>) to be considered as input.</p>
 <p>Start the <code>linked charts</code> application after generating a nearest neighborhood graph per sample.</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span><span class="op">(</span><span class="va">lcsc</span><span class="op">)</span>
 
 <span class="va">k</span> <span class="op">=</span> <span class="fl">50</span>
@@ -168,7 +182,7 @@
 <span class="co">#&gt;  $ idx  : num [1:2700, 1:50] 1 2 3 4 5 6 7 8 9 10 ...</span>
 <span class="co">#&gt;  $ dists: num [1:2700, 1:50] 0 0 0 0 0 0 0 0 0 0 ...</span></code></pre></div>
 <p>Now we can finally starts the <code>linked charts</code> application. <code>k</code> refers to the number of nearest neighbors which are used for smoothing. See the equation above.</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="fu"><a href="reference/lc_vis.html">lc_vis</a></span><span class="op">(</span>cells<span class="op">=</span><span class="va">cells</span>,
        counts<span class="op">=</span><span class="va">counts</span>,
        pc_space<span class="op">=</span><span class="va">pc_space</span>,
@@ -178,7 +192,7 @@
        <span class="op">)</span></code></pre></div>
 <p>The application would look like this after selecting macrophages using the smoothed expression of CD68.</p>
 <p><img src="reference/figures/pbmc_lcsc_application.png"></p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="fu"><a href="https://rdrr.io/r/utils/sessionInfo.html">sessionInfo</a></span><span class="op">(</span><span class="op">)</span>
 <span class="co">#&gt; R version 4.0.3 (2020-10-10)</span>
 <span class="co">#&gt; Platform: x86_64-pc-linux-gnu (64-bit)</span>

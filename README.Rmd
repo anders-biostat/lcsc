@@ -65,19 +65,40 @@ pbmc
 
 To run the linked-charts for single cells, we need to extract the following data for the `Seurat` object.
 
-```{r data}
-# From the Seurat object
+1. Sparse count matrix (rows = genes, cols = cells)
+
+```{r}
 counts <- GetAssayData(pbmc, "counts")
 dim(counts)
-meta_data <- pbmc[[]]
-head(meta_data)
+```
+
+2. PC coordinates
+
+```{r}
 pc_space <- Embeddings(pbmc, "pca")
 dim(pc_space)
+```
+
+
+3. Non-linear dimensional reduction embedding (2D)
+
+```{r}
 embedding <- Embeddings(pbmc, "umap")
 dim(embedding)
+```
 
-# How is the sample column named?
-s = "orig.ident"
+
+4. Cell meta data
+
+```{r}
+meta_data <- pbmc[[]]
+head(meta_data)
+```
+
+Based on these meta we will generate the `cells` that only contains the needed information and will be used to subset the counts according to which sample is selected.
+
+```{r}
+s = "orig.ident"  # name of the sample column
 cells = tibble::tibble(
   id = rownames(meta_data),
   sample = meta_data[[s]]

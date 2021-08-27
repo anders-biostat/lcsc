@@ -1,8 +1,8 @@
 ---
-title: "Analyzing Covid-19 BALF samples"
+title: "Analyzing COVID-19 BALF samples"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Analyzing Covid-19 BALF samples}
+  %\VignetteIndexEntry{Analyzing COVID-19 BALF samples}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -14,14 +14,14 @@ knitr::opts_chunk$set(
 )
 ```
 
+This vignette shows an example how `lcsc` can be used for real data analyses.
 
-# How to use lcsc for real analyses
+## Load Data
 
-For demonstration purposes we will be using the dataset created in the study
-"Single-cell landscape of bronchoalveolar immune cells in COVID-19 patients" 
-by Liao M. et al. 
+For demonstration purposes we will be using the dataset created in the study "Single-cell landscape of bronchoalveolar immune cells in COVID-19 patients" by Liao M. et al. In this study, immune cells were isolated and sequenced from Bronchoalveolar Lavage Fluid (BALF) which was taken from healthy subjects and patients diagnosed with COVID-19.
 
-We authors directly provided the processed data as `Seurat` object which can be downloaded [here](http://cells.ucsc.edu/covid19-balf/nCoV.rds). 
+The authors kindly provided the processed data as `Seurat` object which can be downloaded [here](http://cells.ucsc.edu/covid19-balf/nCoV.rds). Otherwise we could simply run the
+standard preprocessing steps.
 
 ```{r eval=FALSE}
 # Download
@@ -32,19 +32,43 @@ balf <- readRDS(url("http://cells.ucsc.edu/covid19-balf/nCoV.rds","rb"))
 
 ```{r}
 library(Seurat)
-balf <- readRDS("../data/nCoV.rds") # how they do it in the Seurat vignette
+balf <- readRDS("../data/nCoV.rds")
 balf
 ```
 
-To run lcsc we need to extract the following data. Since 
+To run lcsc we need to extract the following data.
+
+  1. Sparse count matrix
 
 ```{r}
-# From Seurat Object
 counts <- GetAssayData(balf, "counts")
-meta_data <- balf[[]]
-pc_space <- Embeddings(balf, "pca")
-embedding <- Embeddings(balf, "umap")
+dim(counts)
+```
 
+  2. PC embedding
+
+```{r}
+pc_space <- Embeddings(balf, "pca")
+dim(pc_space)
+```
+
+  3. Non-linear dimensional reduction embedding (two-dimensional)
+
+```{r}
+embedding <- Embeddings(balf, "umap")
+dim(embedding)
+```
+
+  4. Cell meta data ("coldata")
+
+```{r}
+meta_data <- balf[[]]
+head(meta_data[c("sample", "sample_new", "disease")])
+```
+
+Based on these meta we will generate the `cells` that only contains the needed information and will be used to subset the counts according to which sample is selected.
+
+```{r}
 sample_column <- "sample_new"   # column for sample name
 disease_column <- "disease"   # column for disease state
   
@@ -54,14 +78,15 @@ cells = tibble::tibble(
   disease = meta_data[[disease_column]]
 )
 head(cells)
-table(cells$disease)
 ```
+
+Now lets check how many cells we have in each sample.
 
 ```{r}
 table(cells$sample)
 ```
 
-And we actually notice that the authors mispelled some of the samples. Let's replace the "O" with an "S".
+We notice two things. The total number of cells is not at all equally distributed among all samples and also the authors seem to have mispelled some of the sample names. Let's replace the "O" with an "S".
 
 ```{r}
 cells$sample <- stringr::str_replace(cells$sample, "O(?=[1-3])", "M")
@@ -70,7 +95,7 @@ cells$sample <- stringr::str_replace(cells$sample, "^C(?=[1-5])", "S")
 table(cells$sample)
 ```
 
-Furthermore we can add a condition column to the cells tibble.
+So we actually have 4 samples as healthy control (HC), 3 samples from moderate (M) COVID-19 cases and 6 samples from severe cases (S). Based on the sample name we can add a condition column to the cells tibble.
 
 ```{r}
 cells$condition <- stringr::str_remove(cells$sample, "\\d")
@@ -93,7 +118,6 @@ Now we can load the application and start to annotate cells per sample. This req
 but we do not rely on integration methods for multiple samples or unsupervised learning methods.
 
 ```{r eval=FALSE}
-# Add option to load in annotation/rule file
 lc_vis(cells=cells,
        counts=counts,
        pc_space=pc_space,
@@ -103,8 +127,7 @@ lc_vis(cells=cells,
        )
 ```
 
-The classification of macrophages in each sample could look like this. We define macrophages
-as cells which express CD68 and do not express CD3E (T-cells) or TPPP3 (Epithelial cells).
+The classification of macrophages in each sample could look like this. We define macrophages as cells which express CD68 and do not express CD3E (T-cells) or TPPP3 (Epithelial cells).
 
 ![](../man/figures/macrophages_application.png){width=1000px}
 
@@ -114,22 +137,18 @@ To go back and refine the annotation one should save the annotation and the rule
 save(annotations, rules, file = "macrophage_annotation.RData")
 ```
 
-If one wishes to refine the annotation at some point, one can simply reload the application as done
-above and overwrite the `annotations` and `rules` objects by loading the `.RData` file.
+If one wishes to refine the annotation at some point, one can simply reload the application as done above and overwrite the `annotations` and `rules` objects by loading the `.RData` file.
 
 ```{r}
 load("macrophage_annotation.RData")
 ```
 
-Once we have annotated our cell type of interest we could perform for example differential gene
-expression analysis between the cell type under different conditions (e. g. mild vs. severe 
-Covid-19 infection).
+Once we have annotated our cell type of interest we could perform for example differential gene expression analysis between the cells from the same cell type under different conditions (e. g. mild vs. severe COVID-19 infection). As we have only annotated macrophages so far, we will compare their expression profiles.
 
-To ease such analysis steps the package ships with a function to easily create pseudobulks
-for each cell type that was annotated stratified by some column of the `cells` tibble.
+First, we will need to create pseudobulks for macrophages in each sample from the "M" (mild) and "S" (severe) samples.
 
 ```{r}
-# We want to compare macrophages in mild vs. severe Covid-19
+# We want to compare macrophages in mild vs. severe COVID-19
 mild_samples <- unique(cells$sample)[grepl("M", unique(cells$sample))]
 head(mild_samples)
 severe_samples <- unique(cells$sample)[grepl("S", unique(cells$sample))]
@@ -152,11 +171,19 @@ for (sample in severe_samples) {
 }
 colnames(severe_matrix) <- severe_samples
 head(severe_matrix)
+```
 
+As we will be using `DESeq2` for our differential gene epxression analysis, we have to create a small dataframe describing the samples ("coldata").
+
+```{r}
 coldata <- data.frame(sample=c(mild_samples, severe_samples))
 coldata$condition <- ifelse(startsWith(coldata$sample, "M"), "mild", "severe")
 coldata
+```
 
+Now we can simply run `DESeqDataSetFromMatrix`.
+
+```{r}
 suppressPackageStartupMessages(library(DESeq2))
 dds <- DESeqDataSetFromMatrix(countData = cbind(mild_matrix, severe_matrix),
                                 colData = coldata,
@@ -164,7 +191,11 @@ dds <- DESeqDataSetFromMatrix(countData = cbind(mild_matrix, severe_matrix),
 
 dds <- DESeq(dds)
 res <- results(dds)
+```
 
+And we could for example look at the genes assocatiated with the lowest adjusted p-values.
+
+```{r}
 suppressPackageStartupMessages(library(dplyr))
 res %>%
   as.data.frame %>% 
@@ -173,6 +204,4 @@ res %>%
   select(-pvalue) %>%
   slice_head(n=10)
 ```
-
-
 

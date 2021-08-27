@@ -78,11 +78,41 @@ pbmc
 To run the linked-charts for single cells, we need to extract the
 following data for the `Seurat` object.
 
+1.  Sparse count matrix (rows = genes, cols = cells)
+
+<!-- end list -->
+
 ``` r
-# From the Seurat object
 counts <- GetAssayData(pbmc, "counts")
 dim(counts)
 #> [1] 13714  2700
+```
+
+2.  PC coordinates
+
+<!-- end list -->
+
+``` r
+pc_space <- Embeddings(pbmc, "pca")
+dim(pc_space)
+#> [1] 2700   50
+```
+
+3.  Non-linear dimensional reduction embedding (2D)
+
+<!-- end list -->
+
+``` r
+embedding <- Embeddings(pbmc, "umap")
+dim(embedding)
+#> [1] 2700    2
+```
+
+4.  Cell meta data
+
+<!-- end list -->
+
+``` r
 meta_data <- pbmc[[]]
 head(meta_data)
 #>                  orig.ident nCount_RNA nFeature_RNA percent.mt
@@ -92,15 +122,14 @@ head(meta_data)
 #> AAACCGTGCTTCCG-1     pbmc3k       2639          960  1.7430845
 #> AAACCGTGTATGCG-1     pbmc3k        980          521  1.2244898
 #> AAACGCACTGGTAC-1     pbmc3k       2163          781  1.6643551
-pc_space <- Embeddings(pbmc, "pca")
-dim(pc_space)
-#> [1] 2700   50
-embedding <- Embeddings(pbmc, "umap")
-dim(embedding)
-#> [1] 2700    2
+```
 
-# How is the sample column named?
-s = "orig.ident"
+Based on these meta we will generate the `cells` that only contains the
+needed information and will be used to subset the counts according to
+which sample is selected.
+
+``` r
+s = "orig.ident"  # name of the sample column
 cells = tibble::tibble(
   id = rownames(meta_data),
   sample = meta_data[[s]]
