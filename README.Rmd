@@ -18,8 +18,18 @@ knitr::opts_chunk$set(
 <!-- badges: start -->
 <!-- badges: end -->
 
+## What is it about?
+
 This package allows you to classify single cells based on nearest-neighbor smoothing, 
-not rely on unsupervised learning methods.
+not relying on unsupervised learning methods. The documentation can be found [here](https://anders-biostat.github.io/lcsc/index.html).
+
+Most often annotation of single cell data is done by clustering via graph-based methods followed by differential gene expression analysis between the clusters to find certain marker genes.
+
+In this package we propose to directly start with the marker gene and calculate a smoothed fraction for the marker gene and to select cells based on whether they are above or below a chosen threshold. This smoothed fraction is calculated over the `k` nearest neighbors by dividing the sum of the marker gene counts for the nearest neighbors by their sum of total counts ("library size"). This fraction is subsequently raised to the power of $\gamma$ as some sort of gamma-correction (or Box-Cox correction). The threshold can then be simply chosen by looking at the distribution of this smoothed expression fraction. A screenshot is provided below.
+
+```{r, echo=FALSE, out.width="40%", fig.align='center'}
+knitr::include_graphics("man/figures/formula.png")
+```
 
 ## Installation
 
@@ -32,10 +42,12 @@ devtools::install_github("anders-biostat/lc-sc")
 
 ## Example
 
+As in the [Guided Clustering Tutorial by Seurat](https://satijalab.org/seurat/articles/pbmc3k_tutorial.html), we will be using the PBMCdataset from 10X containing 2,700 single cells that were sequenced on the Illumina NextSeq 500. The raw data are made availbe by 10X [here](https://cf.10xgenomics.com/samples/cell/pbmc3k/pbmc3k_filtered_gene_bc_matrices.tar.gz).
+
 We start of with the standard workflow consisting of quality control, normalization, and
 linear/non-linear dimensional reduction using `Seurat`.
 
-```{r setup, eval=F}
+```{r setup, message=FALSE, warning=FALSE}
 library(dplyr)
 library(Seurat)
 
@@ -47,18 +59,22 @@ pbmc <- FindVariableFeatures(pbmc, selection.method = "vst", nfeatures = 2000)
 pbmc <- ScaleData(pbmc, features = rownames(pbmc))
 pbmc <- RunPCA(pbmc, features = VariableFeatures(object = pbmc))
 pbmc <- FindNeighbors(pbmc, dims = 1:30)
-pbmc <- FindClusters(pbmc, resolution = 0.5)
 pbmc <- RunUMAP(pbmc, dims = 1:30)
+pbmc
 ```
 
-Extract the necessary data from the `Seurat` object.
+To run the linked-charts for single cells, we need to extract the following data for the `Seurat` object.
 
-```{r data, eval=F}
+```{r data}
 # From the Seurat object
 counts <- GetAssayData(pbmc, "counts")
+dim(counts)
 meta_data <- pbmc[[]]
+head(meta_data)
 pc_space <- Embeddings(pbmc, "pca")
+dim(pc_space)
 embedding <- Embeddings(pbmc, "umap")
+dim(embedding)
 
 # How is the sample column named?
 s = "orig.ident"
@@ -66,21 +82,40 @@ cells = tibble::tibble(
   id = rownames(meta_data),
   sample = meta_data[[s]]
 )
+head(cells)
 ```
+
+Additionally we need to generate the neighborhood graph per sample containing the `k` nearest neighbors for each cell. For the computation the `lcsc` package provides the `run_nn` function, which also takes the number of pc_dimensions (`dim`) to be considered as input.
 
 Start the `linked charts` application after generating a nearest neighborhood graph per sample.
 
-```{r eval=F}
+```{r}
 library(lcsc)
 
-# Build nearest neighborhood graph per sample using nn
 k = 50
 nn <- run_nn(cells, pc_space, k=k, dim=30)
-
-lc_vis(cells, counts, pc_space, embedding, nn, k=k)
+str(nn)
 ```
+
+Now we can finally starts the `linked charts` application. `k` refers to the number of
+nearest neighbors which are used for smoothing. See the equation above.
+
+```{r eval = F}
+lc_vis(cells=cells,
+       counts=counts,
+       pc_space=pc_space,
+       embedding=embedding,
+       nn=nn,
+       k=50 # Smoothing the expression over 50 nearest neighbors
+       )
+```
+
 
 The application would look like this after selecting macrophages using the smoothed expression of CD68.
 
 ![](man/figures/pbmc_lcsc_application.png)
+
+```{r}
+sessionInfo()
+```
 

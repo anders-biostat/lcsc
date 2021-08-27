@@ -3,6 +3,5 @@ pkgdown: 1.6.1
 pkgdown_sha: ~
 articles:
   covid-balf-study: covid-balf-study.html
-  get-started: get-started.html
-last_built: 2021-08-27T11:49Z
+last_built: 2021-08-27T13:44Z
 
