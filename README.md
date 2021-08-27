@@ -30,7 +30,7 @@ simply chosen by looking at the distribution of this smoothed expression
 fraction. A screenshot is provided
 below.
 
-<img src="man/figures/formula.png" width="40%" style="display: block; margin: auto;" />
+<img src="man/figures/formula_01.png" width="40%" style="display: block; margin: auto;" />
 
 ## Installation
 
