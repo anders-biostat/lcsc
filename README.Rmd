@@ -28,7 +28,7 @@ Most often annotation of single cell data is done by clustering via graph-based 
 In this package we propose to directly start with the marker gene and calculate a smoothed fraction for the marker gene and to select cells based on whether they are above or below a chosen threshold. This smoothed fraction is calculated over the `k` nearest neighbors by dividing the sum of the marker gene counts for the nearest neighbors by their sum of total counts ("library size"). This fraction is subsequently raised to the power of $\gamma$ as some sort of gamma-correction (or Box-Cox correction). The threshold can then be simply chosen by looking at the distribution of this smoothed expression fraction. A screenshot is provided below.
 
 ```{r, echo=FALSE, out.width="40%", fig.align='center'}
-knitr::include_graphics("man/figures/formula_01.png")
+knitr::include_graphics("man/figures/rendered_image.png")
 ```
 
 ## Installation
